@@ -11,6 +11,7 @@ import json
 import html
 import difflib
 import shutil
+import io
 import pandas as pd
 import streamlit as st
 from typing import List, Dict, Tuple, Any
@@ -21,6 +22,12 @@ try:
     GV_OK = shutil.which("dot") is not None
 except Exception:
     GV_OK = False
+
+try:
+    from PIL import Image, ImageDraw, ImageFont
+    PIL_OK = True
+except Exception:
+    PIL_OK = False
 
 # =========================
 # Dictionnaires par défaut (familles Python réelles)
@@ -670,6 +677,61 @@ def rendre_jpeg_depuis_dot(dot_str: str) -> bytes:
     src = graphviz.Source(dot_str)
     return src.pipe(format="jpg")
 
+
+def _charger_police_fallback(taille: int = 20):
+    """Charge une police TrueType si possible, sinon la police par défaut."""
+    try:
+        return ImageFont.truetype("DejaVuSans.ttf", taille)
+    except Exception:
+        return ImageFont.load_default()
+
+
+def rendre_diagramme_simple(structure: str, condition: str, action_true: str, action_false: str = "") -> bytes:
+    """Rendu alternatif en JPEG lorsque Graphviz est indisponible (basé sur Pillow)."""
+    if not PIL_OK:
+        raise RuntimeError("Pillow n'est pas disponible pour le rendu alternatif.")
+
+    titre = "WHILE" if structure.upper() == "WHILE" else "IF"
+    lignes = [f"Diagramme {titre}"]
+    cond_txt = condition if condition else "(condition non extraite)"
+    act_vrai = action_true if action_true else "(action si vrai non extraite)"
+    act_faux = action_false if action_false else ""
+
+    if titre == "WHILE":
+        lignes += [
+            "",
+            f"Tant que : {cond_txt}",
+            f"→ Action : {act_vrai}",
+            "(boucle jusqu'à condition fausse)",
+        ]
+    else:
+        lignes += ["", f"Si : {cond_txt}", f"Alors : {act_vrai}"]
+        if action_false:
+            lignes.append(f"Sinon : {act_faux if act_faux else '(action alternative non extraite)'}")
+
+    texte = "\n".join(lignes)
+    font = _charger_police_fallback(22)
+    dummy = Image.new("RGB", (10, 10), "white")
+    draw = ImageDraw.Draw(dummy)
+    lignes_txt = texte.splitlines() or [""]
+    marge = 28
+    max_largeur = max(draw.textlength(l, font=font) for l in lignes_txt)
+    hauteur_ligne = font.getbbox("Ag")[3] - font.getbbox("Ag")[1]
+    img_larg = int(max_largeur + 2 * marge)
+    img_haut = int((hauteur_ligne + 10) * len(lignes_txt) + 2 * marge)
+
+    image = Image.new("RGB", (max(img_larg, 320), max(img_haut, 200)), "white")
+    draw = ImageDraw.Draw(image)
+
+    y = marge
+    for ligne in lignes_txt:
+        draw.text((marge, y), ligne, fill="black", font=font)
+        y += hauteur_ligne + 10
+
+    buffer = io.BytesIO()
+    image.save(buffer, format="JPEG", quality=90)
+    return buffer.getvalue()
+
 # =========================
 # État / Session (initialisation)
 # =========================
@@ -967,6 +1029,7 @@ with ong6:
 
                 dot = graphviz_while_dot(sel["condition"], sel["action_true"])
 
+                rendu = False
                 if GV_OK:
                     try:
                         img_bytes = rendre_jpeg_depuis_dot(dot)
@@ -976,12 +1039,26 @@ with ong6:
                                            file_name=f"while_phrase_{sel['id_phrase']}.jpg",
                                            mime="image/jpeg",
                                            key=f"dl_while_jpg_{sel['id_phrase']}_{i}")
+                        rendu = True
                     except Exception as e:
-                        st.error(f"Rendu JPEG indisponible : {e}")
-                        st.code(dot, language="dot")
-                else:
-                    st.error("Graphviz n’est pas disponible pour générer un JPEG. Installez Graphviz (binaire 'dot').")
-                    st.code(dot, language="dot")
+                        st.warning(f"Échec du rendu Graphviz : {e}")
+
+                if not rendu:
+                    try:
+                        img_bytes = rendre_diagramme_simple("WHILE", sel["condition"], sel["action_true"])
+                        st.image(img_bytes, caption=f"Graphe WHILE — phrase {sel['id_phrase']} (mode simplifié)",
+                                 use_container_width=True)
+                        st.download_button(f"Télécharger le graphe WHILE #{sel['id_phrase']} (JPEG simplifié)",
+                                           data=img_bytes,
+                                           file_name=f"while_phrase_{sel['id_phrase']}_simple.jpg",
+                                           mime="image/jpeg",
+                                           key=f"dl_while_simple_{sel['id_phrase']}_{i}")
+                        st.info("Graphviz indisponible : affichage d’un schéma simplifié.")
+                        rendu = True
+                    except Exception as e:
+                        st.error(f"Rendu graphique indisponible : {e}")
+
+                st.code(dot, language="dot")
 
                 with st.expander("Voir la phrase complète"):
                     st.write(sel["phrase"])
@@ -1007,6 +1084,7 @@ with ong6:
 
                 dot = graphviz_if_dot(sel["condition"], sel["action_true"], sel["action_false"])
 
+                rendu = False
                 if GV_OK:
                     try:
                         img_bytes = rendre_jpeg_depuis_dot(dot)
@@ -1016,12 +1094,26 @@ with ong6:
                                            file_name=f"if_phrase_{sel['id_phrase']}.jpg",
                                            mime="image/jpeg",
                                            key=f"dl_if_jpg_{sel['id_phrase']}_{j}")
+                        rendu = True
                     except Exception as e:
-                        st.error(f"Rendu JPEG indisponible : {e}")
-                        st.code(dot, language="dot")
-                else:
-                    st.error("Graphviz n’est pas disponible pour générer un JPEG. Installez Graphviz (binaire 'dot').")
-                    st.code(dot, language="dot")
+                        st.warning(f"Échec du rendu Graphviz : {e}")
+
+                if not rendu:
+                    try:
+                        img_bytes = rendre_diagramme_simple("IF", sel["condition"], sel["action_true"], sel["action_false"])
+                        st.image(img_bytes, caption=f"Graphe IF — phrase {sel['id_phrase']} (mode simplifié)",
+                                 use_container_width=True)
+                        st.download_button(f"Télécharger le graphe IF #{sel['id_phrase']} (JPEG simplifié)",
+                                           data=img_bytes,
+                                           file_name=f"if_phrase_{sel['id_phrase']}_simple.jpg",
+                                           mime="image/jpeg",
+                                           key=f"dl_if_simple_{sel['id_phrase']}_{j}")
+                        st.info("Graphviz indisponible : affichage d’un schéma simplifié.")
+                        rendu = True
+                    except Exception as e:
+                        st.error(f"Rendu graphique indisponible : {e}")
+
+                st.code(dot, language="dot")
 
                 with st.expander("Voir la phrase complète"):
                     st.write(sel["phrase"])
