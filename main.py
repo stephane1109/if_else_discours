@@ -10,6 +10,7 @@ import re
 import json
 import html
 import difflib
+import shutil
 import pandas as pd
 import streamlit as st
 from typing import List, Dict, Tuple, Any
@@ -17,7 +18,7 @@ from typing import List, Dict, Tuple, Any
 # Graphviz (rendu JPEG)
 try:
     import graphviz  # nécessite le binaire Graphviz installé (dot)
-    GV_OK = True
+    GV_OK = shutil.which("dot") is not None
 except Exception:
     GV_OK = False
 
