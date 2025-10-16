@@ -1,3 +1,6 @@
+# Dépendances Python installées via pip.
+# La bibliothèque « graphviz » nécessite aussi le binaire système Graphviz (commande « dot »)
+# pour générer correctement les rendus JPEG.
 streamlit>=1.33,<2.0
 pandas>=2.2,<3.0
 graphviz>=0.20.3,<0.21
