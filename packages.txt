@@ -1,3 +1,2 @@
-# Paquets système nécessaires pour compléter les dépendances Python.
 graphviz
 fonts-dejavu-core
