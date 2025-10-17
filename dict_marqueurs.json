@@ -1,4 +1,5 @@
 {
+  # OBLIGATION
   "il faut": "OBLIGATION",
   "il faut que": "OBLIGATION",
   "il faut de": "OBLIGATION",
@@ -27,6 +28,8 @@
   "à condition de": "OBLIGATION",
   "à condition que": "OBLIGATION",
   "sous certaines conditions": "OBLIGATION",
+  
+  # INTERDICTION
   "interdit": "INTERDICTION",
   "défense de": "INTERDICTION",
   "ne pas": "INTERDICTION",
@@ -56,6 +59,8 @@
   "conseillons": "RECOMMANDATION",
   "mieux vaut": "RECOMMANDATION",
   "il est bon de": "RECOMMANDATION",
+  
+  # SANCTION
   "sanction": "SANCTION",
   "sera sanctionné": "SANCTION",
   "seront sanctionnés": "SANCTION",
@@ -63,6 +68,8 @@
   "peine": "SANCTION",
   "punition": "SANCTION",
   "coût de": "SANCTION",
+
+  # CADRE OUVERTURE
   "parlez librement": "CADRE_OUVERTURE",
   "nous debattrons": "CADRE_OUVERTURE",
   "gouvernement proposera": "CADRE_OUVERTURE",
@@ -74,6 +81,8 @@
   "vous debattrez": "CADRE_OUVERTURE",
   "nous débattrons": "CADRE_OUVERTURE",
   "debattrez": "CADRE_OUVERTURE",
+
+  # CADRE FERMETURE
   "pas de polémique": "CADRE_FERMETURE",
   "ce n’est pas le moment de débattre": "CADRE_FERMETURE",
   "ce n'est pas le moment de débattre": "CADRE_FERMETURE"
