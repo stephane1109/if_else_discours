@@ -12,6 +12,7 @@ import difflib
 import pandas as pd
 import streamlit as st
 from typing import List, Dict, Tuple, Any
+from pathlib import Path
 
 # Graphviz (JPEG si possible)
 try:
@@ -21,137 +22,30 @@ except Exception:
     GV_OK = False
 
 # =========================
-# Dictionnaires par défaut (familles Python réelles)
+# Dictionnaires par défaut (chargés depuis des fichiers JSON)
 # =========================
 
-DICTIONNAIRE_MOT_VERS_CODE_PAR_DEFAUT: Dict[str, str] = {
-    # IF (conditions)
-    "si": "IF",
-    "s'il": "IF",
-    "s'ils": "IF",
-    "si l'on": "IF",
-    "si on": "IF",
-    "si jamais": "IF",
-    "si seulement": "IF",
-    "pourvu que": "IF",
-    "à condition que": "IF",
-    "a condition que": "IF",
-    "à condition de": "IF",
-    "a condition de": "IF",
-    "à condition d'": "IF",
-    "a condition d'": "IF",
-    "sous réserve que": "IF",
-    "sous reserve que": "IF",
-    "sous condition que": "IF",
-    "dans le cas où": "IF",
-    "dans le cas ou": "IF",
-    "au cas où": "IF",
-    "au cas ou": "IF",
-    "sous certaines conditions": "IF",
+REPERTOIRE_DONNEES = Path(__file__).resolve().parent
 
-    # ELSE
-    "sinon": "ELSE",
 
-    # WHILE
-    "tant que": "WHILE",
+def charger_dictionnaire_json(nom_fichier: str) -> Dict[str, str]:
+    """Charge un dictionnaire JSON (clé/valeur chaînes) depuis le répertoire de l'application."""
 
-    # AND
-    "et": "AND",
-    "ainsi que": "AND",
-    "de même que": "AND",
-    "de meme que": "AND",
-    "et aussi": "AND",
+    chemin = REPERTOIRE_DONNEES / nom_fichier
+    try:
+        with chemin.open("r", encoding="utf-8") as flux:
+            contenu = json.load(flux)
+    except FileNotFoundError as exc:
+        raise FileNotFoundError(f"Fichier JSON manquant : {chemin}") from exc
 
-    # OR
-    "ou": "OR",
-    "ou bien": "OR",
-    "ou alors": "OR",
-    "soit": "OR",
-}
+    if not isinstance(contenu, dict):
+        raise ValueError(f"Le fichier {chemin} doit contenir un dictionnaire JSON.")
 
-MARQUEURS_PAR_DEFAUT: Dict[str, str] = {
-    # OBLIGATION
-    "il faut": "OBLIGATION",
-    "il faut que": "OBLIGATION",
-    "il faut de": "OBLIGATION",
-    "nous devons": "OBLIGATION",
-    "vous devez": "OBLIGATION",
-    "doit": "OBLIGATION",
-    "doivent": "OBLIGATION",
-    "devra": "OBLIGATION",
-    "devront": "OBLIGATION",
-    "il faudra": "OBLIGATION",
-    "il faudra que": "OBLIGATION",
-    "il devra": "OBLIGATION",
-    "il devra être": "OBLIGATION",
-    "obligatoire": "OBLIGATION",
-    "il s'impose": "OBLIGATION",
-    "s'impose à": "OBLIGATION",
-    "il appartient à": "OBLIGATION",
-    "il revient à": "OBLIGATION",
-    "il convient de": "OBLIGATION",
-    "il y a lieu de": "OBLIGATION",
-    "il y a urgence": "OBLIGATION",
-    "il est urgent de": "OBLIGATION",
-    "il est indispensable de": "OBLIGATION",
-    "il est nécessaire de": "OBLIGATION",
-    "il est temps de": "OBLIGATION",
-    "à condition de": "OBLIGATION",
-    "à condition que": "OBLIGATION",
-    "sous certaines conditions": "OBLIGATION",
+    return {str(cle): str(valeur) for cle, valeur in contenu.items()}
 
-    # INTERDICTION
-    "interdit": "INTERDICTION",
-    "défense de": "INTERDICTION",
-    "ne pas": "INTERDICTION",
-    "il ne faut pas": "INTERDICTION",
-    "il n'est pas possible de": "INTERDICTION",
-    "ne peut pas": "INTERDICTION",
-    "ne peuvent pas": "INTERDICTION",
-    "ne pourra pas": "INTERDICTION",
-    "ne pourront pas": "INTERDICTION",
 
-    # PERMISSION
-    "autorisé": "PERMISSION",
-    "autorisés": "PERMISSION",
-    "autorisées": "PERMISSION",
-    "permis": "PERMISSION",
-    "on peut": "PERMISSION",
-    "il est possible de": "PERMISSION",
-    "il peut": "PERMISSION",
-    "peut": "PERMISSION",
-    "peuvent": "PERMISSION",
-    "pourra": "PERMISSION",
-    "pourront": "PERMISSION",
-
-    # RECOMMANDATION
-    "il est recommandé": "RECOMMANDATION",
-    "il serait souhaitable de": "RECOMMANDATION",
-    "il est souhaitable de": "RECOMMANDATION",
-    "devrait": "RECOMMANDATION",
-    "devrions": "RECOMMANDATION",
-    "conseillons": "RECOMMANDATION",
-    "mieux vaut": "RECOMMANDATION",
-    "il est bon de": "RECOMMANDATION",
-
-    # SANCTION
-    "sanction": "SANCTION",
-    "sera sanctionné": "SANCTION",
-    "seront sanctionnés": "SANCTION",
-    "amende": "SANCTION",
-    "peine": "SANCTION",
-    "punition": "SANCTION",
-    "coût de": "SANCTION",
-
-    # CADRE
-    "parlez librement": "CADRE_OUVERTURE",
-    "ouverture du dialogue": "CADRE_OUVERTURE",
-    "librement": "CADRE_OUVERTURE",
-    "mieux vaut montrer une france unie": "CADRE_OUVERTURE",
-    "pas de polémique": "CADRE_FERMETURE",
-    "ce n’est pas le moment de débattre": "CADRE_FERMETURE",
-    "ce n'est pas le moment de débattre": "CADRE_FERMETURE",
-}
+dic_code: Dict[str, str] = charger_dictionnaire_json("dic_code.json")
+dict_marqueurs: Dict[str, str] = charger_dictionnaire_json("dict_marqueurs.json")
 
 # =========================
 # Représentation Python (étiquette affichée) et styles
@@ -719,9 +613,9 @@ def rendre_jpeg_depuis_dot(dot_str: str) -> bytes:
 # =========================
 
 if "dico_mot_vers_code" not in st.session_state:
-    st.session_state["dico_mot_vers_code"] = DICTIONNAIRE_MOT_VERS_CODE_PAR_DEFAUT.copy()
+    st.session_state["dico_mot_vers_code"] = dic_code.copy()
 if "dico_marqueurs" not in st.session_state:
-    st.session_state["dico_marqueurs"] = MARQUEURS_PAR_DEFAUT.copy()
+    st.session_state["dico_marqueurs"] = dict_marqueurs.copy()
 
 # =========================
 # Interface
