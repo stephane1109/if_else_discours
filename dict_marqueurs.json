@@ -66,6 +66,10 @@
   "ouverture du dialogue": "CADRE_OUVERTURE",
   "librement": "CADRE_OUVERTURE",
   "mieux vaut montrer une france unie": "CADRE_OUVERTURE",
+  "vous voterez": "CADRE_OUVERTURE",
+  "voterez": "CADRE_OUVERTURE",
+  "vous debattrez": "CADRE_OUVERTURE",
+  "debattrez": "CADRE_OUVERTURE",
   "pas de polémique": "CADRE_FERMETURE",
   "ce n’est pas le moment de débattre": "CADRE_FERMETURE",
   "ce n'est pas le moment de débattre": "CADRE_FERMETURE"
