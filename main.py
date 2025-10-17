@@ -1,33 +1,24 @@
 # -*- coding: utf-8 -*-
 # Application Streamlit : discours politique → code (constructions Python existantes)
-# + marqueurs normatifs + vues graphiques WHILE et IF en JPEG
-# + annotation avec cases à cocher simples par famille IF/ELSE/WHILE/AND/OR
-# + clés uniques pour tous les st.download_button
-# + onglet « Co-occurrence » retiré, guide détaillé rétabli
+# + marqueurs normatifs + vues graphiques WHILE et IF en affichage direct
+# + export JPEG si Graphviz (binaire 'dot') présent
+# + annotation avec cases à cocher : IF (si), ELSE (sinon), WHILE (tant que), AND (et), OR (ou)
 # Auteur : Vous
 
 import re
 import json
 import html
 import difflib
-import shutil
-import io
 import pandas as pd
 import streamlit as st
 from typing import List, Dict, Tuple, Any
 
-# Graphviz (rendu JPEG)
+# Graphviz (JPEG si possible)
 try:
-    import graphviz  # nécessite le binaire Graphviz installé (dot)
-    GV_OK = shutil.which("dot") is not None
+    import graphviz  # nécessite le binaire Graphviz installé (dot) pour l'export JPEG
+    GV_OK = True
 except Exception:
     GV_OK = False
-
-try:
-    from PIL import Image, ImageDraw, ImageFont
-    PIL_OK = True
-except Exception:
-    PIL_OK = False
 
 # =========================
 # Dictionnaires par défaut (familles Python réelles)
@@ -226,7 +217,7 @@ def construire_regex_depuis_liste(expressions: List[str]) -> List[Tuple[str, re.
 # =========================
 
 def lire_fichier_txt(uploaded_file) -> str:
-    """Lit un fichier .txt avec stratégie automatique d’encodage (sans réglage UI)."""
+    """Lit un fichier .txt avec stratégie automatique d’encodage."""
     if uploaded_file is None:
         return ""
     donnees = uploaded_file.getvalue()
@@ -287,7 +278,7 @@ def detecter_marqueurs_normatifs(texte: str, dico: Dict[str, str]) -> pd.DataFra
     return df
 
 # =========================
-# Négation : ajustements regex uniquement
+# Négation : ajustements regex
 # =========================
 
 def ajuster_negations_regex(phrase: str, dets_phrase: pd.DataFrame, treat_ne_sans_pas_as_neg: bool = False) -> pd.DataFrame:
@@ -516,7 +507,7 @@ def extraire_candidats_connecteurs(texte: str) -> List[str]:
     return sorted(candidats)
 
 def rapport_couverture_lexique(dico_conn: Dict[str, str], df_conn: pd.DataFrame, texte: str) -> Tuple[pd.DataFrame, pd.DataFrame]:
-    """Retourne (1) couverture par famille ; (2) candidats proches non reconnus."""
+    """Retourne (candidats proches non reconnus, couverture par famille)."""
     code_to_keys = {}
     for k, v in dico_conn.items():
         code_to_keys.setdefault(v, set()).add(k)
@@ -553,10 +544,10 @@ def rapport_couverture_lexique(dico_conn: Dict[str, str], df_conn: pd.DataFrame,
             "similarite": round(score_best, 3)
         })
     df_candidats = pd.DataFrame(enregs).sort_values(["code_suggere", "similarite"], ascending=[True, False]).reset_index(drop=True)
-    return df_candidats, df_couv  # (on gardera l’ordre d’usage dans l’onglet)
+    return df_candidats, df_couv
 
 # =========================
-# Vues graphiques : WHILE et IF (afficher TOUTES les occurrences) + export JPEG
+# Vues graphiques : WHILE et IF (toutes occurrences)
 # =========================
 
 def extraire_segments_while(texte: str) -> List[Dict[str, Any]]:
@@ -580,36 +571,82 @@ def extraire_segments_while(texte: str) -> List[Dict[str, Any]]:
             })
     return res
 
+def _proposition_principale_apres_dernier_si(phrase: str, last_si_end: int) -> str:
+    """
+    Heuristique pour les phrases du type :
+    'Si A, si B, [Proposition principale] ...'
+    On prend ce qui suit la première ponctuation après la dernière condition 'si', sinon tout ce qui suit.
+    """
+    reste = phrase[last_si_end:].strip()
+    m = re.search(r"[,;:\-\—]\s+", reste)
+    if m:
+        return reste[m.end():].strip()
+    return reste
+
 def extraire_segments_if(texte: str) -> List[Dict[str, Any]]:
-    """Extrait les occurrences de 'si … [alors …] [sinon …]' avec découpes simples."""
+    """
+    Extrait toutes les occurrences de 'si …' dans chaque phrase.
+
+    Règles :
+      - On repère toutes les clauses conditionnelles 'si …' successives.
+      - L'Action si Vrai est la proposition principale :
+            • si du texte non vide existe AVANT le premier 'si' → on le prend ;
+            • sinon → on prend le segment APRÈS la dernière clause 'si …'.
+      - Action si Faux = après 'sinon' (si présent).
+      - On génère un graphe pour CHAQUE 'si …' trouvé (condition = segment local de la clause).
+    """
     res = []
     phrases = segmenter_en_phrases(texte)
     for idx, ph in enumerate(phrases, start=1):
-        for m in re.finditer(r"\bsi\b(?:\s+l['’]on|\s+on|\s+jamais|\s+seulement)?|\bs['’]il(?:s)?\b", ph, flags=re.I):
-            suite = ph[m.end():].strip()
-            m_alors = re.search(r"\balors\b", suite, flags=re.I)
-            if m_alors:
-                condition = suite[:m_alors.start()].strip(" ,;:-—")
-                reste = suite[m_alors.end():].strip()
-            else:
-                cut = re.split(r"[,;:\-\—]\s+", suite, maxsplit=1)
-                condition = cut[0].strip() if cut else suite
-                reste = cut[1].strip() if len(cut) > 1 else ""
+        matches = list(re.finditer(r"\bsi\b|\bs['’]il(?:s)?\b|\bsi\s+l['’]on\b|\bsi\s+on\b", ph, flags=re.I))
+        if not matches:
+            continue
 
-            action_true = reste
-            action_false = ""
-            m_sinon = re.search(r"\bsinon\b", reste, flags=re.I)
-            if m_sinon:
-                action_true = reste[:m_sinon.start()].strip(" ,;:-—")
-                action_false = reste[m_sinon.end():].strip(" .;:-—")
+        # repère sinon (pour l'else)
+        action_false = ""
+        m_sinon = re.search(r"\bsinon\b", ph, flags=re.I)
+        if m_sinon:
+            action_false = ph[m_sinon.end():].strip(" .;:-—")
+
+        # action candidate 1 : texte avant le premier 'si'
+        action_true_gauche = ph[:matches[0].start()].strip(" .;:-—")
+
+        # action candidate 2 : texte après la dernière clause 'si'
+        def fin_clause_si(start_pos: int) -> int:
+            sub = ph[start_pos:].strip()
+            m = re.search(r"[,;:\-\—]\s+", sub)
+            if m:
+                return start_pos + m.start()
+            return len(ph)
+
+        last = matches[-1]
+        last_clause_end = fin_clause_si(last.end())
+        action_true_droite = _proposition_principale_apres_dernier_si(ph, last_clause_end).strip(" .;:-—")
+
+        # choix final de l'action vraie
+        if action_true_gauche:
+            action_true_commune = action_true_gauche
+        else:
+            action_true_commune = action_true_droite
+
+        # génère une condition par 'si'
+        for k, m in enumerate(matches):
+            # extrait la condition locale : du 'si' jusqu'à la 1re ponctuation (ou jusqu'au prochain 'si')
+            debut_cond = m.end()
+            segment = ph[debut_cond:]
+            m_ponc = re.search(r"[,;:\-\—]\s+", segment)
+            fin_cond_rel = m_ponc.start() if m_ponc else len(segment)
+            if k + 1 < len(matches):
+                fin_cond_rel = min(fin_cond_rel, matches[k+1].start() - debut_cond)
+            condition = segment[:fin_cond_rel].strip()
 
             res.append({
                 "type": "IF",
                 "id_phrase": idx,
                 "phrase": ph.strip(),
-                "condition": condition.strip(" ."),
-                "action_true": action_true.strip(" ."),
-                "action_false": action_false.strip(" ."),
+                "condition": condition,
+                "action_true": action_true_commune,
+                "action_false": action_false.strip(),
                 "debut": m.start(),
             })
     return res
@@ -638,7 +675,7 @@ digraph G {{
     return dot
 
 def graphviz_if_dot(condition: str, action_true: str, action_false: str = "") -> str:
-    """Construit un code DOT pour IF/ELSE."""
+    """Construit un code DOT pour IF/ELSE (sans mention « then »)."""
     def esc(s: str) -> str:
         return s.replace('"', r"\"")
     cond_txt = esc(condition if condition else "(condition non extraite)")
@@ -652,10 +689,10 @@ def graphviz_if_dot(condition: str, action_true: str, action_false: str = "") ->
         '  node [shape=box, fontname="Helvetica"];',
         '  start [shape=circle, label="Start"];',
         f'  cond  [shape=diamond, label="if ({cond_txt})"];',
-        f'  actt  [shape=box, label="{act_t}"];',
+        f'  actt  [shape=box, label="Action si Vrai: {act_t}"];',
     ]
     if has_else:
-        dot.append(f'  actf  [shape=box, label="{act_f}"];')
+        dot.append(f'  actf  [shape=box, label="Action si Faux: {act_f}"];')
     dot.append('  end   [shape=doublecircle, label="End"];')
     dot += [
         "  start -> cond;",
@@ -676,61 +713,6 @@ def rendre_jpeg_depuis_dot(dot_str: str) -> bytes:
         raise RuntimeError("Graphviz (binaire 'dot') indisponible sur ce système.")
     src = graphviz.Source(dot_str)
     return src.pipe(format="jpg")
-
-
-def _charger_police_fallback(taille: int = 20):
-    """Charge une police TrueType si possible, sinon la police par défaut."""
-    try:
-        return ImageFont.truetype("DejaVuSans.ttf", taille)
-    except Exception:
-        return ImageFont.load_default()
-
-
-def rendre_diagramme_simple(structure: str, condition: str, action_true: str, action_false: str = "") -> bytes:
-    """Rendu alternatif en JPEG lorsque Graphviz est indisponible (basé sur Pillow)."""
-    if not PIL_OK:
-        raise RuntimeError("Pillow n'est pas disponible pour le rendu alternatif.")
-
-    titre = "WHILE" if structure.upper() == "WHILE" else "IF"
-    lignes = [f"Diagramme {titre}"]
-    cond_txt = condition if condition else "(condition non extraite)"
-    act_vrai = action_true if action_true else "(action si vrai non extraite)"
-    act_faux = action_false if action_false else ""
-
-    if titre == "WHILE":
-        lignes += [
-            "",
-            f"Tant que : {cond_txt}",
-            f"→ Action : {act_vrai}",
-            "(boucle jusqu'à condition fausse)",
-        ]
-    else:
-        lignes += ["", f"Si : {cond_txt}", f"Alors : {act_vrai}"]
-        if action_false:
-            lignes.append(f"Sinon : {act_faux if act_faux else '(action alternative non extraite)'}")
-
-    texte = "\n".join(lignes)
-    font = _charger_police_fallback(22)
-    dummy = Image.new("RGB", (10, 10), "white")
-    draw = ImageDraw.Draw(dummy)
-    lignes_txt = texte.splitlines() or [""]
-    marge = 28
-    max_largeur = max(draw.textlength(l, font=font) for l in lignes_txt)
-    hauteur_ligne = font.getbbox("Ag")[3] - font.getbbox("Ag")[1]
-    img_larg = int(max_largeur + 2 * marge)
-    img_haut = int((hauteur_ligne + 10) * len(lignes_txt) + 2 * marge)
-
-    image = Image.new("RGB", (max(img_larg, 320), max(img_haut, 200)), "white")
-    draw = ImageDraw.Draw(image)
-
-    y = marge
-    for ligne in lignes_txt:
-        draw.text((marge, y), ligne, fill="black", font=font)
-        y += hauteur_ligne + 10
-
-    buffer = io.BytesIO()
-    image.save(buffer, format="JPEG", quality=90)
-    return buffer.getvalue()
 
 # =========================
 # État / Session (initialisation)
@@ -814,9 +796,9 @@ else:
     df_conn = pd.DataFrame()
     df_norm = pd.DataFrame()
 
-# Onglets (co-occurrence retiré)
-ong1, ong2, ong3, ong4, ong5, ong6 = st.tabs([
-    "Expressions mappées", "Détections", "Couverture du lexique", "Dictionnaires (JSON)", "Guide d’interprétation", "Graphiques (IF / WHILE)"
+# Onglets
+ong1, ong2, ong3, ong4, ong5 = st.tabs([
+    "Expressions mappées", "Détections", "Dictionnaires (JSON)", "Guide d’interprétation", "Graphiques (IF / WHILE)"
 ])
 
 # Onglet 1 : Expressions mappées
@@ -837,7 +819,7 @@ with ong1:
     st.subheader("Explication des marqueurs normatifs (dictionnaire enrichi)")
     st.write("Les marqueurs normatifs détectent les segments prescriptifs : OBLIGATION, INTERDICTION, PERMISSION, RECOMMANDATION, SANCTION, ainsi que l’ouverture/fermeture du cadre de débat.")
 
-# Onglet 2 : Détections + texte annoté (cases simples par famille)
+# Onglet 2 : Détections + texte annoté
 with ong2:
     st.subheader("Connecteurs détectés")
     if df_conn.empty:
@@ -860,32 +842,27 @@ with ong2:
                            key="dl_occ_marq_csv")
 
     st.markdown("---")
-    st.subheader("Texte annoté : cases à cocher simples par **famille**")
+    st.subheader("Texte annoté")
+    st.caption("Affiche les connecteurs Python existants : IF (si), ELSE (sinon), WHILE (tant que), AND (et), OR (ou).")
 
     colA, colB, colC, colD, colE = st.columns(5)
     with colA:
-        show_if = st.checkbox("IF (if)", value=True)
+        show_if = st.checkbox("IF (si)", value=True)
     with colB:
-        show_else = st.checkbox("ELSE (else)", value=True)
+        show_else = st.checkbox("ELSE (sinon)", value=True)
     with colC:
-        show_while = st.checkbox("WHILE (while)", value=True)
+        show_while = st.checkbox("WHILE (tant que)", value=True)
     with colD:
-        show_and = st.checkbox("AND (and)", value=True)
+        show_and = st.checkbox("AND (et)", value=True)
     with colE:
-        show_or = st.checkbox("OR (or)", value=True)
+        show_or = st.checkbox("OR (ou)", value=True)
 
     show_marqueurs = st.checkbox("Afficher les marqueurs normatifs", value=True)
     filt_marq = st.multiselect("Limiter aux catégories de marqueurs (optionnel)",
                                ["OBLIGATION","INTERDICTION","PERMISSION","RECOMMANDATION","SANCTION","CADRE_OUVERTURE","CADRE_FERMETURE"],
                                default=[])
 
-    show_codes = {
-        "IF": show_if,
-        "ELSE": show_else,
-        "WHILE": show_while,
-        "AND": show_and,
-        "OR": show_or,
-    }
+    show_codes = {"IF": show_if, "ELSE": show_else, "WHILE": show_while, "AND": show_and, "OR": show_or}
 
     st.markdown(css_badges(), unsafe_allow_html=True)
     if not texte_source.strip():
@@ -906,31 +883,8 @@ with ong2:
                            file_name="texte_annote.html", mime="text/html",
                            key="dl_annote_html")
 
-# Onglet 3 : Couverture du lexique
+# Onglet 3 : Dictionnaires (JSON)
 with ong3:
-    st.subheader("Couverture du lexique (connecteurs Python) et candidats proches non reconnus")
-    if not texte_source.strip():
-        st.info("Aucun texte fourni.")
-    else:
-        df_candidats, df_couv = rapport_couverture_lexique(st.session_state["dico_mot_vers_code"], df_conn, texte_source)
-        st.markdown("Résumé par famille de connecteurs")
-        st.dataframe(df_couv, use_container_width=True, hide_index=True)
-        st.download_button("Exporter couverture (CSV)",
-                           data=df_couv.to_csv(index=False).encode("utf-8"),
-                           file_name="couverture_lexique_connecteurs.csv", mime="text/csv",
-                           key="dl_couv_csv")
-        st.markdown("Candidats proches non reconnus (propositions d’enrichissement du dictionnaire)")
-        if df_candidats.empty:
-            st.info("Aucun candidat proche détecté avec les heuristiques actuelles.")
-        else:
-            st.dataframe(df_candidats, use_container_width=True, hide_index=True)
-            st.download_button("Exporter candidats (CSV)",
-                               data=df_candidats.to_csv(index=False).encode("utf-8"),
-                               file_name="candidats_connecteurs.csv", mime="text/csv",
-                               key="dl_cand_csv")
-
-# Onglet 4 : Dictionnaires (JSON)
-with ong4:
     sous1, sous2 = st.tabs(["Connecteurs (JSON)", "Marqueurs normatifs (JSON)"])
     with sous1:
         st.json(st.session_state["dico_mot_vers_code"], expanded=False)
@@ -945,70 +899,58 @@ with ong4:
                            file_name="dictionnaire_marqueurs.json", mime="application/json",
                            key="dl_marq_json_tab")
 
-# Onglet 5 : Guide d’interprétation (détaillé)
-with ong5:
+# Onglet 4 : Guide d’interprétation (détaillé)
+with ong4:
     st.subheader("Guide d’interprétation : Python vs analyse de discours")
 
     st.markdown("#### IF")
     st.write(
         "Cadre Python : `if` introduit une condition booléenne ; le bloc indenté s’exécute si la condition est vraie. "
         "On enchaîne souvent `elif` (autres cas) puis `else` (cas par défaut). "
-        "En Python, la condition doit évaluer à `True`/`False` (valeurs dites truthy/falsy admises). "
+        "La condition doit évaluer à `True`/`False` (truthy/falsy admis). "
         "Exemples : `if x > 0:`, `if user and is_admin:`.\n\n"
-        "Cadre analyse : « si », « à condition que », « pourvu que », « au cas où », etc. posent une **condition d’acceptabilité** "
-        "ou de **mise en œuvre**. Elles délimitent ce qui doit être vrai pour autoriser la suite de l’énoncé (promesse, action, engagement). "
-        "Repérer ces formes permet d’identifier les clauses de contingence (quand/à quelles conditions on agit)."
+        "Cadre analyse : « si », « à condition que », « pourvu que », « au cas où » posent une **condition d’acceptabilité** "
+        "ou de **mise en œuvre**. Repérer ces formes révèle les clauses de contingence des engagements."
     )
 
     st.markdown("#### ELSE")
     st.write(
-        "Cadre Python : `else` est la branche alternative quand la condition précédente est fausse. "
-        "Elle n’a pas de condition propre ; elle couvre le « tout le reste ».\n\n"
-        "Cadre analyse : « sinon » introduit l’**alternative par défaut** ou un **coût narratif** si la condition échoue. "
-        "Cela structure le discours en **deux issues** distinctes (acceptation vs rejet de la condition)."
+        "Cadre Python : `else` est la branche alternative quand la condition précédente est fausse ; elle couvre le « reste ».\n\n"
+        "Cadre analyse : « sinon » marque l’**alternative par défaut** ou un **coût** si la condition n’est pas remplie."
     )
 
     st.markdown("#### WHILE")
     st.write(
-        "Cadre Python : `while` répète un bloc tant que l’expression reste vraie ; le corps peut comporter `break` (sortie) ou `continue` (saut à l’itération suivante). "
-        "Attention aux boucles infinies si la condition ne change pas.\n\n"
-        "Cadre analyse : « tant que » exprime une **persistance conditionnelle** (maintien d’une action ou d’une politique tant qu’un état perdure). "
-        "On modélise ainsi la **durée** des engagements : quelles actions se maintiennent et à quelles conditions cessent-elles ?"
+        "Cadre Python : `while` répète un bloc tant que l’expression reste vraie ; `break` sort, `continue` saute à l’itération suivante.\n\n"
+        "Cadre analyse : « tant que » exprime une **persistance conditionnelle** (maintien d’une action tant qu’un état perdure)."
     )
 
     st.markdown("#### AND")
     st.write(
-        "Cadre Python : `and` évalue en court-circuit (si la première sous-condition est fausse, la seconde n’est pas évaluée). "
-        "Il exige que **toutes** les sous-conditions soient vraies pour que l’ensemble soit vrai. "
-        "Exemples : `if budget_ok and votes >= seuil:`.\n\n"
-        "Cadre analyse : « et », « ainsi que », « de même que » **agrègent** des éléments, des causes ou des engagements pour construire un **front commun**. "
-        "Ils servent à cumuler des critères (tous requis), à densifier l’argumentaire et à afficher des coalitions (X **et** Y)."
+        "Cadre Python : `and` exige que toutes les sous-conditions soient vraies ; court-circuit.\n\n"
+        "Cadre analyse : « et », « ainsi que » **agrègent** des critères/engagements pour construire un **front commun**."
     )
 
     st.markdown("#### OR")
     st.write(
-        "Cadre Python : `or` est vrai si **au moins** une sous-condition est vraie (court-circuit si la première est vraie). "
-        "Exemples : `if crise or urgence:`.\n\n"
-        "Cadre analyse : « ou », « ou bien », « soit » posent des **alternatives**. "
-        "L’usage répétitif de `ou` peut signaler une **délégation du choix** à l’auditoire ou une **flexibilité** stratégique."
+        "Cadre Python : `or` est vrai si au moins une sous-condition est vraie ; court-circuit.\n\n"
+        "Cadre analyse : « ou », « ou bien », « soit » posent des **alternatives**."
     )
 
     st.markdown("#### Négation et verbe « pouvoir »")
     st.write(
-        "Le script reclassifie automatiquement les constructions **« ne … peut/peuvent/pourra/pourront (pas/plus/jamais) »** en **INTERDICTION**. "
-        "Option disponible pour traiter aussi l’ellipse « ne … peut » sans « pas » (sauf « peut-être ») lorsque des pertes de mots négatifs sont suspectées. "
-        "Dans l’analyse, ces formes modulent la **permission** : de la permission explicite (« on peut ») à la **fermeture** (« on ne peut pas »)."
+        "Reclassement automatique des formes « ne … peut/peuvent/pourra/pourront (pas/plus/jamais) » en **INTERDICTION**. "
+        "Option pour traiter l’ellipse « ne … peut » (sans « pas ») en négation, sauf « peut-être »."
     )
 
     st.markdown("#### Marqueurs normatifs")
     st.write(
-        "Les catégories OBLIGATION / INTERDICTION / PERMISSION / RECOMMANDATION / SANCTION / CADRE_OUVERTURE / CADRE_FERMETURE guident la lecture pragmatique : "
-        "**qui contraint qui**, **qu’est-ce qui est interdit/autorisé**, **quels coûts/menaces** sont attachés à l’inaction, "
-        "et **quel cadre d’échange** est promu (ou fermé). Leur co-présence avec des `if/while` éclaire les stratégies d’engagement conditionnel."
+        "OBLIGATION / INTERDICTION / PERMISSION / RECOMMANDATION / SANCTION / CADRE_OUVERTURE / CADRE_FERMETURE : "
+        "lecture pragmatique de qui contraint qui, des coûts/menaces et du cadre d’échange."
     )
 
-# Onglet 6 : Graphiques (IF / WHILE) — tout afficher, export JPEG
-with ong6:
+# Onglet 5 : Graphiques (IF / WHILE) — affichage direct + export JPEG si possible
+with ong5:
     st.subheader("Boucles WHILE détectées")
     if not texte_source.strip():
         st.info("Aucun texte fourni.")
@@ -1028,37 +970,18 @@ with ong6:
                     st.write(sel["action_true"] if sel["action_true"] else "(implicite ou non extraite)")
 
                 dot = graphviz_while_dot(sel["condition"], sel["action_true"])
+                st.graphviz_chart(dot, use_container_width=True)
 
-                rendu = False
                 if GV_OK:
                     try:
                         img_bytes = rendre_jpeg_depuis_dot(dot)
-                        st.image(img_bytes, caption=f"Graphe WHILE — phrase {sel['id_phrase']}", use_container_width=True)
                         st.download_button(f"Télécharger le graphe WHILE #{sel['id_phrase']} (JPEG)",
                                            data=img_bytes,
                                            file_name=f"while_phrase_{sel['id_phrase']}.jpg",
                                            mime="image/jpeg",
                                            key=f"dl_while_jpg_{sel['id_phrase']}_{i}")
-                        rendu = True
                     except Exception as e:
-                        st.warning(f"Échec du rendu Graphviz : {e}")
-
-                if not rendu:
-                    try:
-                        img_bytes = rendre_diagramme_simple("WHILE", sel["condition"], sel["action_true"])
-                        st.image(img_bytes, caption=f"Graphe WHILE — phrase {sel['id_phrase']} (mode simplifié)",
-                                 use_container_width=True)
-                        st.download_button(f"Télécharger le graphe WHILE #{sel['id_phrase']} (JPEG simplifié)",
-                                           data=img_bytes,
-                                           file_name=f"while_phrase_{sel['id_phrase']}_simple.jpg",
-                                           mime="image/jpeg",
-                                           key=f"dl_while_simple_{sel['id_phrase']}_{i}")
-                        st.info("Graphviz indisponible : affichage d’un schéma simplifié.")
-                        rendu = True
-                    except Exception as e:
-                        st.error(f"Rendu graphique indisponible : {e}")
-
-                st.code(dot, language="dot")
+                        st.error(f"Export JPEG indisponible : {e}")
 
                 with st.expander("Voir la phrase complète"):
                     st.write(sel["phrase"])
@@ -1076,44 +999,25 @@ with ong6:
                     st.markdown("Condition (if)")
                     st.write(sel["condition"] if sel["condition"] else "(non extraite)")
                 with col2:
-                    st.markdown("Action si Vrai (then)")
+                    st.markdown("Action si Vrai")
                     st.write(sel["action_true"] if sel["action_true"] else "(implicite ou non extraite)")
                 with col3:
                     st.markdown("Action si Faux (else)")
                     st.write(sel["action_false"] if sel["action_false"] else "(absente)")
 
                 dot = graphviz_if_dot(sel["condition"], sel["action_true"], sel["action_false"])
+                st.graphviz_chart(dot, use_container_width=True)
 
-                rendu = False
                 if GV_OK:
                     try:
                         img_bytes = rendre_jpeg_depuis_dot(dot)
-                        st.image(img_bytes, caption=f"Graphe IF — phrase {sel['id_phrase']}", use_container_width=True)
                         st.download_button(f"Télécharger le graphe IF #{sel['id_phrase']} (JPEG)",
                                            data=img_bytes,
                                            file_name=f"if_phrase_{sel['id_phrase']}.jpg",
                                            mime="image/jpeg",
                                            key=f"dl_if_jpg_{sel['id_phrase']}_{j}")
-                        rendu = True
                     except Exception as e:
-                        st.warning(f"Échec du rendu Graphviz : {e}")
-
-                if not rendu:
-                    try:
-                        img_bytes = rendre_diagramme_simple("IF", sel["condition"], sel["action_true"], sel["action_false"])
-                        st.image(img_bytes, caption=f"Graphe IF — phrase {sel['id_phrase']} (mode simplifié)",
-                                 use_container_width=True)
-                        st.download_button(f"Télécharger le graphe IF #{sel['id_phrase']} (JPEG simplifié)",
-                                           data=img_bytes,
-                                           file_name=f"if_phrase_{sel['id_phrase']}_simple.jpg",
-                                           mime="image/jpeg",
-                                           key=f"dl_if_simple_{sel['id_phrase']}_{j}")
-                        st.info("Graphviz indisponible : affichage d’un schéma simplifié.")
-                        rendu = True
-                    except Exception as e:
-                        st.error(f"Rendu graphique indisponible : {e}")
-
-                st.code(dot, language="dot")
+                        st.error(f"Export JPEG indisponible : {e}")
 
                 with st.expander("Voir la phrase complète"):
                     st.write(sel["phrase"])
