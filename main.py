@@ -1,62 +1,66 @@
 # -*- coding: utf-8 -*-
-# Application Streamlit : discours politique → code (constructions Python existantes)
-# + marqueurs normatifs + vues graphiques WHILE et IF en affichage direct
-# + export JPEG si Graphviz (binaire 'dot') présent
-# + annotation avec cases à cocher : IF (si), ELSE (sinon), WHILE (tant que), AND (et), OR (ou)
-# Auteur : Vous
+# main.py — Discours → Code (IF / ELSE / WHILE / AND / OR) + Marqueurs + Causes/Conséquences
+# Méthodes comparées : Regex vs spaCy (transformer si disponible)
+#
+# Fichiers requis à la racine (même dossier que ce script) :
+#   - dic_code.json          : mapping des connecteurs → familles Python (IF/ELSE/WHILE/AND/OR)
+#   - dict_marqueurs.json    : marqueurs normatifs (OBLIGATION/INTERDICTION/…)
+#   - consequences.json      : déclencheurs de conséquence → "CONSEQUENCE"
+#   - causes.json            : déclencheurs de cause → "CAUSE"
+#
+# Remarques :
+#   - L’extraction CAUSE→CONSEQUENCE spaCy exploite la dépendance/les ancres causales et consécutives.
+#   - Négation « ne … pouvoir … (pas/plus/jamais) » : ajustement par regex (sans options supplémentaires).
+#   - Graphes IF/WHILE : rendu DOT (à l’écran) + export JPEG si Graphviz est présent (binaire 'dot').
 
+import os
 import re
 import json
 import html
-import difflib
 import pandas as pd
 import streamlit as st
 from typing import List, Dict, Tuple, Any
-from pathlib import Path
 
-# Graphviz (JPEG si possible)
+# =========================
+# Détection Graphviz (pour export JPEG)
+# =========================
 try:
-    import graphviz  # nécessite le binaire Graphviz installé (dot) pour l'export JPEG
+    import graphviz
     GV_OK = True
 except Exception:
     GV_OK = False
 
-# =========================
-# Dictionnaires par défaut (chargés depuis des fichiers JSON)
-# =========================
-
-REPERTOIRE_DONNEES = Path(__file__).resolve().parent
-
-
-def charger_dictionnaire_json(nom_fichier: str) -> Dict[str, str]:
-    """Charge un dictionnaire JSON (clé/valeur chaînes) depuis le répertoire de l'application."""
-
-    chemin = REPERTOIRE_DONNEES / nom_fichier
-    try:
-        with chemin.open("r", encoding="utf-8") as flux:
-            contenu = json.load(flux)
-    except FileNotFoundError as exc:
-        raise FileNotFoundError(f"Fichier JSON manquant : {chemin}") from exc
-
-    if not isinstance(contenu, dict):
-        raise ValueError(f"Le fichier {chemin} doit contenir un dictionnaire JSON.")
-
-    return {str(cle): str(valeur) for cle, valeur in contenu.items()}
-
-
-dic_code: Dict[str, str] = charger_dictionnaire_json("dic_code.json")
-dict_marqueurs: Dict[str, str] = charger_dictionnaire_json("dict_marqueurs.json")
+def rendre_jpeg_depuis_dot(dot_str: str) -> bytes:
+    """Rend en JPEG via graphviz.Source.pipe(format='jpg')."""
+    if not GV_OK:
+        raise RuntimeError("Graphviz (binaire 'dot') indisponible sur ce système.")
+    src = graphviz.Source(dot_str)
+    return src.pipe(format="jpg")
 
 # =========================
-# Représentation Python (étiquette affichée) et styles
+# Chargement spaCy (transformer si possible)
 # =========================
+SPACY_OK = False
+NLP = None
+try:
+    import spacy
+    # Essais : un modèle FR transformer, puis fallback sur fr_core_news_md
+    for name in ("fr_dep_news_trf", "fr_core_news_trf", "fr_core_news_md"):
+        try:
+            NLP = spacy.load(name)
+            SPACY_OK = True
+            break
+        except Exception:
+            continue
+except Exception:
+    SPACY_OK = False
+    NLP = None
 
+# =========================
+# Palettes / libellés Python (affichage)
+# =========================
 CODE_VERS_PYTHON: Dict[str, str] = {
-    "IF": "if",
-    "ELSE": "else",
-    "WHILE": "while",
-    "AND": "and",
-    "OR": "or",
+    "IF": "if", "ELSE": "else", "WHILE": "while", "AND": "and", "OR": "or"
 }
 
 COULEURS_BADGES: Dict[str, Dict[str, str]] = {
@@ -75,12 +79,18 @@ COULEURS_MARQUEURS: Dict[str, Dict[str, str]] = {
     "SANCTION": {"bg": "#fde7f3", "fg": "#ad1457", "bd": "#ad1457"},
     "CADRE_OUVERTURE": {"bg": "#e6f7ff", "fg": "#0277bd", "bd": "#0277bd"},
     "CADRE_FERMETURE": {"bg": "#ede7f6", "fg": "#6a1b9a", "bd": "#6a1b9a"},
+    "CONSEQUENCE": {"bg": "#fff0f0", "fg": "#b00020", "bd": "#b00020"},
+    "CAUSE": {"bg": "#f0fff4", "fg": "#2f855a", "bd": "#2f855a"},
+}
+
+FAMILLES_CONNECTEURS = {"IF", "ELSE", "WHILE", "AND", "OR"}
+FAMILLES_MARQUEURS_STANDARD = {
+    "OBLIGATION", "INTERDICTION", "PERMISSION", "RECOMMANDATION", "SANCTION", "CADRE_OUVERTURE", "CADRE_FERMETURE"
 }
 
 # =========================
 # Utilitaires texte / regex
 # =========================
-
 def normaliser_espace(texte: str) -> str:
     """Homogénéise espaces et apostrophes afin de stabiliser les recherches."""
     if not texte:
@@ -107,9 +117,35 @@ def construire_regex_depuis_liste(expressions: List[str]) -> List[Tuple[str, re.
     return motifs
 
 # =========================
-# I/O fichiers
+# Chargement JSON à la racine
 # =========================
+def charger_json_dico(chemin: str) -> Dict[str, str]:
+    """Charge un JSON dict { expression: etiquette } ; normalise les clés côté détection."""
+    if not os.path.isfile(chemin):
+        raise FileNotFoundError(f"Fichier introuvable : {chemin}")
+    with open(chemin, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    if not isinstance(data, dict):
+        raise ValueError(f"Format JSON non supporté (attendu dict) : {chemin}")
+    return {normaliser_espace(k.lower()): str(v).upper() for k, v in data.items() if k and str(k).strip()}
 
+def charger_tous_les_dicos() -> Tuple[Dict[str, str], Dict[str, str], Dict[str, str], Dict[str, str]]:
+    """Charge dic_code.json, dict_marqueurs.json, consequences.json, causes.json à la racine du projet."""
+    cwd = os.getcwd()
+    d_code = charger_json_dico(os.path.join(cwd, "dic_code.json"))
+    d_marq = charger_json_dico(os.path.join(cwd, "dict_marqueurs.json"))
+    d_cons = charger_json_dico(os.path.join(cwd, "consequences.json"))
+    d_caus = charger_json_dico(os.path.join(cwd, "causes.json"))
+
+    codes_utilises = set(d_code.values())
+    attendus = FAMILLES_CONNECTEURS
+    if not codes_utilises.issubset(attendus):
+        raise ValueError(f"dic_code.json contient des familles inconnues : {sorted(list(codes_utilises - attendus))}")
+    return d_code, d_marq, d_cons, d_caus
+
+# =========================
+# I/O discours
+# =========================
 def lire_fichier_txt(uploaded_file) -> str:
     """Lit un fichier .txt avec stratégie automatique d’encodage."""
     if uploaded_file is None:
@@ -123,11 +159,10 @@ def lire_fichier_txt(uploaded_file) -> str:
     return donnees.decode("utf-8", errors="ignore")
 
 # =========================
-# Détection (connecteurs / marqueurs)
+# Détection (connecteurs / marqueurs / conséquence / cause)
 # =========================
-
-def detecter_connecteurs(texte: str, dico: Dict[str, str]) -> pd.DataFrame:
-    """Renvoie un tableau des occurrences de connecteurs repérés dans le texte."""
+def detecter_par_dico(texte: str, dico: Dict[str, str], champ_cle: str, champ_cat: str) -> pd.DataFrame:
+    """Détection générique par dictionnaire clé→étiquette (insensible à la casse)."""
     if not dico:
         return pd.DataFrame()
     texte_norm = normaliser_espace(texte)
@@ -136,49 +171,45 @@ def detecter_connecteurs(texte: str, dico: Dict[str, str]) -> pd.DataFrame:
     enregs = []
     for i, ph in enumerate(phrases, start=1):
         ph_norm = normaliser_espace(ph)
-        for c, motif in motifs:
-            for m in motif.finditer(ph_norm):
-                enregs.append({"id_phrase": i, "phrase": ph.strip(), "connecteur": c, "code": dico[c], "position": m.start()})
-    df = pd.DataFrame(enregs)
-    if not df.empty:
-        df.sort_values(by=["id_phrase","position"], inplace=True, kind="mergesort")
-        df.reset_index(drop=True, inplace=True)
-    return df
-
-def detecter_marqueurs_normatifs(texte: str, dico: Dict[str, str]) -> pd.DataFrame:
-    """Renvoie un tableau des occurrences de marqueurs normatifs repérés dans le texte (avant ajustements)."""
-    if not dico:
-        return pd.DataFrame()
-    texte_norm = normaliser_espace(texte)
-    phrases = segmenter_en_phrases(texte_norm)
-    motifs = construire_regex_depuis_liste(list(dico.keys()))
-    enregs = []
-    for i, ph in enumerate(phrases, start=1):
-        ph_norm = normaliser_espace(ph)
-        for cle, motif in motifs:
+        for cle_norm, motif in motifs:
             for m in motif.finditer(ph_norm):
                 enregs.append({
                     "id_phrase": i,
                     "phrase": ph.strip(),
-                    "marqueur": cle,
-                    "categorie": dico[cle],
+                    champ_cle: cle_norm,
+                    champ_cat: dico[cle_norm],
                     "position": m.start(),
                     "longueur": m.end() - m.start()
                 })
     df = pd.DataFrame(enregs)
     if not df.empty:
-        df.sort_values(by=["id_phrase","position"], inplace=True, kind="mergesort")
+        df.sort_values(by=["id_phrase", "position"], inplace=True, kind="mergesort")
         df.reset_index(drop=True, inplace=True)
     return df
 
-# =========================
-# Négation : ajustements regex
-# =========================
+def detecter_connecteurs(texte: str, dico_conn: Dict[str, str]) -> pd.DataFrame:
+    return detecter_par_dico(texte, dico_conn, "connecteur", "code")
 
-def ajuster_negations_regex(phrase: str, dets_phrase: pd.DataFrame, treat_ne_sans_pas_as_neg: bool = False) -> pd.DataFrame:
+def detecter_marqueurs(texte: str, dico_marq: Dict[str, str]) -> pd.DataFrame:
+    return detecter_par_dico(texte, dico_marq, "marqueur", "categorie")
+
+def detecter_consequences_lex(texte: str, dico_consq: Dict[str, str]) -> pd.DataFrame:
+    # On ajoute une colonne 'consequence' pour homogénéiser les affichages regex
+    df = detecter_par_dico(texte, dico_consq, "consequence", "categorie")
+    return df
+
+def detecter_causes_lex(texte: str, dico_causes: Dict[str, str]) -> pd.DataFrame:
+    # On ajoute une colonne 'cause' pour homogénéiser les affichages regex
+    df = detecter_par_dico(texte, dico_causes, "cause", "categorie")
+    return df
+
+# =========================
+# Négation (regex autour de "pouvoir")
+# =========================
+def ajuster_negations_regex(phrase: str, dets_phrase: pd.DataFrame) -> pd.DataFrame:
     """
     Reclasse en INTERDICTION les formes 'ne … peut/peuvent/pourra/pourront (pas/plus/jamais)'.
-    Optionnel : traiter 'ne … peut' même SANS 'pas' comme négation (ellipse), sauf 'peut-être'.
+    Ne traite pas d'autre verbe ; pas d'option 'ne … peut' sans 'pas'.
     """
     if dets_phrase.empty:
         return dets_phrase
@@ -193,14 +224,6 @@ def ajuster_negations_regex(phrase: str, dets_phrase: pd.DataFrame, treat_ne_san
     for pat in patrons:
         for m in re.finditer(pat, phrase, flags=re.I):
             spans_neg.append((m.start(), m.end()))
-
-    if treat_ne_sans_pas_as_neg:
-        for m in re.finditer(r"\bne\s+\w{0,2}\s*peut\b(?![-\s]*être)\b", phrase, flags=re.I):
-            fin = len(phrase)
-            virg = re.search(r"[,;:\.\!\?]", phrase[m.end():])
-            if virg:
-                fin = m.end() + virg.start()
-            spans_neg.append((m.start(), fin))
 
     if not spans_neg:
         return dets_phrase
@@ -223,34 +246,31 @@ def ajuster_negations_regex(phrase: str, dets_phrase: pd.DataFrame, treat_ne_san
                 dets.at[idx, "marqueur"] = f"ne {row['marqueur']} (négation)"
     return dets
 
-def ajuster_negations_global(texte: str, df_norm: pd.DataFrame, treat_ne_sans_pas_as_neg: bool = False) -> pd.DataFrame:
-    """Applique les ajustements de négation phrase par phrase uniquement via regex."""
-    if df_norm.empty:
-        return df_norm
+def ajuster_negations_global(texte: str, df_marq: pd.DataFrame) -> pd.DataFrame:
+    """Applique les ajustements de négation phrase par phrase (regex)."""
+    if df_marq.empty:
+        return df_marq
     phrases = segmenter_en_phrases(texte)
     dets_list = []
     for i, ph in enumerate(phrases, start=1):
-        bloc = df_norm[df_norm["id_phrase"] == i].copy()
+        bloc = df_marq[df_marq["id_phrase"] == i].copy()
         if bloc.empty:
             dets_list.append(bloc); continue
-        bloc = ajuster_negations_regex(ph, bloc, treat_ne_sans_pas_as_neg=treat_ne_sans_pas_as_neg)
+        bloc = ajuster_negations_regex(ph, bloc)
         dets_list.append(bloc)
-    df_adj = pd.concat(dets_list, ignore_index=True) if dets_list else df_norm
+    df_adj = pd.concat(dets_list, ignore_index=True) if dets_list else df_marq
     if not df_adj.empty:
         df_adj.sort_values(by=["id_phrase","position"], inplace=True, kind="mergesort")
         df_adj.reset_index(drop=True, inplace=True)
     return df_adj
 
 # =========================
-# Annotation HTML (texte + badges) — filtres simples par famille
+# Annotation HTML (texte + badges)
 # =========================
-
 def _esc(s: str) -> str:
-    """Échappe le HTML pour un affichage sûr."""
     return html.escape(s, quote=False)
 
 def css_badges() -> str:
-    """CSS pour les badges et styles d’annotation."""
     lignes = [
         "<style>",
         ".texte-annote { line-height: 1.8; font-size: 1.05rem; white-space: pre-wrap; }",
@@ -268,17 +288,25 @@ def css_badges() -> str:
 
 def occurrences_mixte(texte: str,
                       dico_conn: Dict[str, str],
-                      dico_norm: Dict[str, str]) -> List[Dict[str, Any]]:
-    """Retourne toutes les occurrences (connecteurs + marqueurs), avec élimination des chevauchements."""
+                      dico_marq: Dict[str, str],
+                      dico_consq: Dict[str, str],
+                      dico_causes: Dict[str, str]) -> List[Dict[str, Any]]:
+    """Fusionne toutes les occurrences, élimine les chevauchements (priorité au plus long)."""
     occs: List[Dict[str, Any]] = []
-    for type_lib, dico in [("connecteur", dico_conn), ("marqueur", dico_norm)]:
+    for typ, dico in [
+        ("connecteur", dico_conn),
+        ("marqueur", dico_marq),
+        ("consequence", dico_consq),
+        ("cause", dico_causes),
+    ]:
+        if not dico:
+            continue
         motifs = construire_regex_depuis_liste(list(dico.keys()))
         for cle, motif in motifs:
             for m in motif.finditer(texte):
-                etiquette = dico[cle]
                 occs.append({
                     "debut": m.start(), "fin": m.end(), "original": texte[m.start():m.end()],
-                    "type": type_lib, "cle": cle, "etiquette": etiquette, "longueur": m.end()-m.start(),
+                    "type": typ, "cle": cle, "etiquette": dico[cle], "longueur": m.end()-m.start(),
                 })
     occs.sort(key=lambda x: (x["debut"], -x["longueur"]))
     res = []; borne = -1
@@ -288,52 +316,60 @@ def occurrences_mixte(texte: str,
     return res
 
 def libelle_python(code: str) -> str:
-    """Retourne l’étiquette Python à afficher."""
     return CODE_VERS_PYTHON.get(str(code).upper(), str(code).upper())
 
 def html_annote(texte: str,
                 dico_conn: Dict[str, str],
-                dico_norm: Dict[str, str],
+                dico_marq: Dict[str, str],
+                dico_consq: Dict[str, str],
+                dico_causes: Dict[str, str],
                 show_codes: Dict[str, bool],
                 show_marqueurs: bool,
+                show_consequences: bool,
+                show_causes: bool,
                 filtres_marqueurs: List[str] = None) -> str:
-    """
-    Produit le HTML annoté où l’étiquette Python colorée est placée à côté du mot français.
-    show_codes : dict {'IF':True/False, 'ELSE':..., 'WHILE':..., 'AND':..., 'OR':...}
-    show_marqueurs : afficher ou non les marqueurs normatifs
-    filtres_marqueurs : listes de catégories à garder (si vide → toutes)
-    """
+    """Produit le HTML annoté selon les cases cochées."""
     if not texte:
         return "<div class='texte-annote'>(Texte vide)</div>"
     filtres_marqueurs = set([c.upper() for c in (filtres_marqueurs or [])])
 
     t = texte
-    occ = occurrences_mixte(t, dico_conn, dico_norm)
+    occ = occurrences_mixte(t, dico_conn, dico_marq, dico_consq, dico_causes)
     morceaux: List[str] = []; curseur = 0
     for m in occ:
+        # Filtres d’affichage
         if m["type"] == "connecteur":
             code = str(m["etiquette"]).upper()
             if not show_codes.get(code, True):
                 continue
-        else:
+        elif m["type"] == "marqueur":
             if not show_marqueurs:
                 continue
             cat = str(m["etiquette"]).upper()
             if filtres_marqueurs and cat not in filtres_marqueurs:
                 continue
+        elif m["type"] == "consequence":
+            if not show_consequences:
+                continue
+        elif m["type"] == "cause":
+            if not show_causes:
+                continue
 
         if m["debut"] > curseur:
             morceaux.append(_esc(t[curseur:m["debut"]]))
+
         mot_original = _esc(t[m["debut"]:m["fin"]])
         if m["type"] == "connecteur":
             code = str(m["etiquette"]).upper()
             badge = f"<span class='badge-code code-{_esc(code)}'>{_esc(libelle_python(code))}</span>"
             rendu = f"<span class='connecteur'>{mot_original}</span>{badge}"
         else:
-            cat = str(m["etiquette"]).upper()
-            badge = f"<span class='badge-marqueur marq-{_esc(cat)}'>{_esc(cat)}</span>"
+            cat_disp = str(m["etiquette"]).upper()
+            badge = f"<span class='badge-marqueur marq-{_esc(cat_disp)}'>{_esc(cat_disp)}</span>"
             rendu = f"<span class='mot-marque'>{mot_original}</span>{badge}"
+
         morceaux.append(rendu); curseur = m["fin"]
+
     if curseur < len(t):
         morceaux.append(_esc(t[curseur:]))
 
@@ -342,110 +378,13 @@ def html_annote(texte: str,
     return "<div class='texte-annote'>" + "".join(morceaux) + "</div>"
 
 def html_autonome(fragment_html: str) -> str:
-    """Génère un document HTML autonome avec CSS embarqué."""
     return f"<!DOCTYPE html><html lang='fr'><head><meta charset='utf-8'/><title>Texte annoté</title>{css_badges()}</head><body>{fragment_html}</body></html>"
 
 # =========================
-# Couverture du lexique et candidats
+# Extraction graphes WHILE / IF (heuristiques)
 # =========================
-
-def classer_candidat_code(expr: str) -> str:
-    """Heuristique pour deviner la famille Python (IF/ELSE/WHILE/AND/OR) d’un candidat."""
-    e = expr.lower()
-    if re.search(r"\b(et|ainsi que|de même que|de meme que|et aussi)\b", e): return "AND"
-    if re.search(r"\b(ou|ou bien|ou alors|soit)\b", e): return "OR"
-    if re.search(r"\btant que\b", e): return "WHILE"
-    if re.search(r"\bsinon\b", e): return "ELSE"
-    if re.search(r"\b(si|s['’]il|s['’]ils|si l'on|si on|si jamais|si seulement|pourvu que|à condition|a condition|sous r[ée]serve|sous condition|au cas o[uù]|dans le cas o[uù])\b", e): return "IF"
-    return ""
-
-def extraire_candidats_connecteurs(texte: str) -> List[str]:
-    """Extrait des locutions candidates liées aux familles Python gérées."""
-    t = " " + normaliser_espace(texte) + " "
-    candidats = set()
-    patrons = [
-        # IF
-        r"\bs['’]?il[s]?\b(?:\s+\w+){0,2}",
-        r"\bsi\b(?:\s+\w+){0,6}",
-        r"\bsi\s+jamais\b(?:\s+\w+){0,3}",
-        r"\bsi\s+seulement\b(?:\s+\w+){0,3}",
-        r"\bpourvu\s+que\b(?:\s+\w+){0,3}",
-        r"\bà\s+condition\s+que\b(?:\s+\w+){0,3}",
-        r"\bà\s+condition\s+d['’]?\b(?:\w+\s*){0,3}",
-        r"\bsous\s+r[ée]serve\s+que\b(?:\s+\w+){0,3}",
-        r"\bsous\s+condition\s+que\b(?:\s+\w+){0,3}",
-        r"\bau\s+cas\s+o[uù]\b(?:\s+\w+){0,3}",
-        r"\bdans\s+le\s+cas\s+o[uù]\b(?:\s+\w+){0,3}",
-        # ELSE
-        r"\bsinon\b",
-        # WHILE
-        r"\btant\s+que\b(?:\s+\w+){0,6}",
-        # AND
-        r"\bet\b",
-        r"\bainsi\s+que\b",
-        r"\bde\s+m[eè]me\s+que\b",
-        r"\bet\s+aussi\b",
-        # OR
-        r"\bou\b",
-        r"\bou\s+bien\b",
-        r"\bou\s+alors\b",
-        r"\bsoit\b",
-    ]
-    for pat in patrons:
-        for m in re.finditer(pat, t, flags=re.I):
-            expr = m.group(0).strip()
-            toks = expr.split()
-            if len(toks) > 7:
-                expr = " ".join(toks[:7])
-            candidats.add(expr.lower())
-    return sorted(candidats)
-
-def rapport_couverture_lexique(dico_conn: Dict[str, str], df_conn: pd.DataFrame, texte: str) -> Tuple[pd.DataFrame, pd.DataFrame]:
-    """Retourne (candidats proches non reconnus, couverture par famille)."""
-    code_to_keys = {}
-    for k, v in dico_conn.items():
-        code_to_keys.setdefault(v, set()).add(k)
-    observes_uniques = set(df_conn["connecteur"].str.lower()) if not df_conn.empty else set()
-    familles = ["IF","ELSE","WHILE","AND","OR"]
-
-    lignes = []
-    for code in familles:
-        keys = code_to_keys.get(code, set())
-        connus = len(keys)
-        observes = len(keys & observes_uniques)
-        non_obs = max(0, connus - observes)
-        lignes.append({"code": code, "connus": connus, "observes": observes, "non_observes": non_obs})
-    df_couv = pd.DataFrame(lignes)
-
-    candidats = set(extraire_candidats_connecteurs(texte))
-    candidats = [c for c in candidats if c not in dico_conn]
-    enregs = []
-    for cand in candidats:
-        code_guess = classer_candidat_code(cand)
-        if not code_guess:
-            continue
-        ref_keys = sorted(list(code_to_keys.get(code_guess, set())))
-        best = ""
-        score_best = 0.0
-        for ref in ref_keys:
-            s = difflib.SequenceMatcher(None, cand, ref).ratio()
-            if s > score_best:
-                score_best = s; best = ref
-        enregs.append({
-            "candidat": cand,
-            "code_suggere": code_guess,
-            "cle_proche": best,
-            "similarite": round(score_best, 3)
-        })
-    df_candidats = pd.DataFrame(enregs).sort_values(["code_suggere", "similarite"], ascending=[True, False]).reset_index(drop=True)
-    return df_candidats, df_couv
-
-# =========================
-# Vues graphiques : WHILE et IF (toutes occurrences)
-# =========================
-
 def extraire_segments_while(texte: str) -> List[Dict[str, Any]]:
-    """Extrait les occurrences de 'tant que …' et sépare grossièrement condition/action sur la 1re ponctuation faible."""
+    """Extrait 'tant que ...' ; condition = segment après 'tant que' jusqu’à la 1re ponctuation, action = suite éventuelle."""
     res = []
     phrases = segmenter_en_phrases(texte)
     for idx, ph in enumerate(phrases, start=1):
@@ -465,30 +404,23 @@ def extraire_segments_while(texte: str) -> List[Dict[str, Any]]:
             })
     return res
 
-def _proposition_principale_apres_dernier_si(phrase: str, last_si_end: int) -> str:
-    """
-    Heuristique pour les phrases du type :
-    'Si A, si B, [Proposition principale] ...'
-    On prend ce qui suit la première ponctuation après la dernière condition 'si', sinon tout ce qui suit.
-    """
+def _proposition_principale_apres_dernier_si(phrase: str, last_si_end: int, df_consq_phrase: pd.DataFrame) -> str:
+    """Si un déclencheur de conséquence apparaît après la dernière condition, prendre ce qui suit ; sinon couper à la 1re ponctuation."""
     reste = phrase[last_si_end:].strip()
+    if df_consq_phrase is not None and not df_consq_phrase.empty:
+        locs = sorted(set(df_consq_phrase["consequence"].tolist()), key=lambda s: len(s), reverse=True)
+        for loc in locs:
+            pat = re.compile(rf"(?<![A-Za-zÀ-ÖØ-öø-ÿ]){re.escape(loc)}(?![A-Za-zÀ-ÖØ-öø-ÿ])", flags=re.I)
+            m = pat.search(phrase, pos=last_si_end)
+            if m:
+                return phrase[m.end():].strip(" .;:-—")
     m = re.search(r"[,;:\-\—]\s+", reste)
     if m:
-        return reste[m.end():].strip()
-    return reste
+        return reste[m.end():].strip(" .;:-—")
+    return reste.strip(" .;:-—")
 
-def extraire_segments_if(texte: str) -> List[Dict[str, Any]]:
-    """
-    Extrait toutes les occurrences de 'si …' dans chaque phrase.
-
-    Règles :
-      - On repère toutes les clauses conditionnelles 'si …' successives.
-      - L'Action si Vrai est la proposition principale :
-            • si du texte non vide existe AVANT le premier 'si' → on le prend ;
-            • sinon → on prend le segment APRÈS la dernière clause 'si …'.
-      - Action si Faux = après 'sinon' (si présent).
-      - On génère un graphe pour CHAQUE 'si …' trouvé (condition = segment local de la clause).
-    """
+def extraire_segments_if(texte: str, df_consq_global: pd.DataFrame) -> List[Dict[str, Any]]:
+    """Extrait toutes les occurrences 'si ...' ; action si vrai = apodose commune après la dernière condition ; else si 'sinon' présent."""
     res = []
     phrases = segmenter_en_phrases(texte)
     for idx, ph in enumerate(phrases, start=1):
@@ -496,16 +428,17 @@ def extraire_segments_if(texte: str) -> List[Dict[str, Any]]:
         if not matches:
             continue
 
-        # repère sinon (pour l'else)
         action_false = ""
         m_sinon = re.search(r"\bsinon\b", ph, flags=re.I)
         if m_sinon:
             action_false = ph[m_sinon.end():].strip(" .;:-—")
 
-        # action candidate 1 : texte avant le premier 'si'
+        cons_this = pd.DataFrame()
+        if df_consq_global is not None and not df_consq_global.empty:
+            cons_this = df_consq_global[df_consq_global["id_phrase"] == idx]
+
         action_true_gauche = ph[:matches[0].start()].strip(" .;:-—")
 
-        # action candidate 2 : texte après la dernière clause 'si'
         def fin_clause_si(start_pos: int) -> int:
             sub = ph[start_pos:].strip()
             m = re.search(r"[,;:\-\—]\s+", sub)
@@ -515,17 +448,10 @@ def extraire_segments_if(texte: str) -> List[Dict[str, Any]]:
 
         last = matches[-1]
         last_clause_end = fin_clause_si(last.end())
-        action_true_droite = _proposition_principale_apres_dernier_si(ph, last_clause_end).strip(" .;:-—")
+        action_true_droite = _proposition_principale_apres_dernier_si(ph, last_clause_end, cons_this)
+        action_true_commune = action_true_gauche if action_true_gauche else action_true_droite
 
-        # choix final de l'action vraie
-        if action_true_gauche:
-            action_true_commune = action_true_gauche
-        else:
-            action_true_commune = action_true_droite
-
-        # génère une condition par 'si'
         for k, m in enumerate(matches):
-            # extrait la condition locale : du 'si' jusqu'à la 1re ponctuation (ou jusqu'au prochain 'si')
             debut_cond = m.end()
             segment = ph[debut_cond:]
             m_ponc = re.search(r"[,;:\-\—]\s+", segment)
@@ -546,12 +472,11 @@ def extraire_segments_if(texte: str) -> List[Dict[str, Any]]:
     return res
 
 def graphviz_while_dot(condition: str, action: str) -> str:
-    """Construit un code DOT simple pour WHILE."""
-    def esc(s: str) -> str:
-        return s.replace('"', r"\"")
+    """Construit un DOT simple pour WHILE."""
+    def esc(s: str) -> str: return s.replace('"', r"\"")
     cond_txt = esc(condition if condition else "(condition non extraite)")
     act_txt = esc(action if action else "(action implicite ou non extraite)")
-    dot = f'''
+    return f'''
 digraph G {{
   rankdir=LR;
   node [shape=box, fontname="Helvetica"];
@@ -559,25 +484,21 @@ digraph G {{
   cond [shape=diamond, label="while ({cond_txt})"];
   act  [shape=box, label="{act_txt}"];
   end  [shape=doublecircle, label="End"];
-
   start -> cond;
-  cond -> act [label="True"];
+  cond -> act [label="Vrai"];
   act  -> cond [label="itère"];
-  cond -> end [label="False"];
+  cond -> end [label="Faux"];
 }}
 '''
-    return dot
 
 def graphviz_if_dot(condition: str, action_true: str, action_false: str = "") -> str:
-    """Construit un code DOT pour IF/ELSE (sans mention « then »)."""
-    def esc(s: str) -> str:
-        return s.replace('"', r"\"")
+    """Construit un DOT simple pour IF."""
+    def esc(s: str) -> str: return s.replace('"', r"\"")
     cond_txt = esc(condition if condition else "(condition non extraite)")
     act_t = esc(action_true if action_true else "(action si vrai non extraite)")
     act_f = esc(action_false) if action_false else ""
     has_else = bool(action_false.strip())
-
-    dot = [
+    lignes = [
         "digraph G {",
         "  rankdir=LR;",
         '  node [shape=box, fontname="Helvetica"];',
@@ -586,86 +507,203 @@ def graphviz_if_dot(condition: str, action_true: str, action_false: str = "") ->
         f'  actt  [shape=box, label="Action si Vrai: {act_t}"];',
     ]
     if has_else:
-        dot.append(f'  actf  [shape=box, label="Action si Faux: {act_f}"];')
-    dot.append('  end   [shape=doublecircle, label="End"];')
-    dot += [
+        lignes.append(f'  actf  [shape=box, label="Action si Faux: {act_f}"];')
+    lignes.append('  end   [shape=doublecircle, label="End"];')
+    lignes += [
         "  start -> cond;",
-        '  cond  -> actt [label="True"];',
+        '  cond  -> actt [label="Vrai"];',
         "  actt  -> end;",
     ]
     if has_else:
-        dot += [
-            '  cond  -> actf [label="False"];',
-            "  actf  -> end;",
-        ]
-    dot.append("}")
-    return "\n".join(dot)
-
-def rendre_jpeg_depuis_dot(dot_str: str) -> bytes:
-    """Rend un graphe DOT en JPEG (octets). Nécessite Graphviz installé."""
-    if not GV_OK:
-        raise RuntimeError("Graphviz (binaire 'dot') indisponible sur ce système.")
-    src = graphviz.Source(dot_str)
-    return src.pipe(format="jpg")
+        lignes += ['  cond  -> actf [label="Faux"];', "  actf  -> end;"]
+    lignes.append("}")
+    return "\n".join(lignes)
 
 # =========================
-# État / Session (initialisation)
+# spaCy : extraction CAUSE → CONSÉQUENCE
 # =========================
+def _locution_match(tok, locutions_norm: set) -> bool:
+    """Teste un match simple sur le token lui-même ou sa sous-chaîne de sous-arbre."""
+    t = tok.lower_
+    if t in locutions_norm:
+        return True
+    surface = " ".join(w.lower_ for w in tok.subtree)
+    return any(loc in surface for loc in locutions_norm)
 
-if "dico_mot_vers_code" not in st.session_state:
-    st.session_state["dico_mot_vers_code"] = dic_code.copy()
-if "dico_marqueurs" not in st.session_state:
-    st.session_state["dico_marqueurs"] = dict_marqueurs.copy()
+def extraire_cause_consequence_spacy(texte: str, nlp, causes_lex: List[str], consequences_lex: List[str]) -> pd.DataFrame:
+    """
+    Retourne un DataFrame avec les segments CAUSE/CONSÉQUENCE extraits par analyse dépendancielle.
+    Colonnes : id_phrase, type, cause_span, consequence_span, ancre, methode, phrase
+    """
+    if not nlp:
+        return pd.DataFrame()
+
+    doc = nlp(texte)
+    causes_norm = {c.lower().strip() for c in causes_lex}
+    consq_norm = {c.lower().strip() for c in consequences_lex}
+    enregs = []
+    prev_sent_text = ""
+
+    for pid, sent in enumerate(doc.sents, start=1):
+        # Subordonnées causales (mark ∈ causes)
+        for tok in sent:
+            if tok.dep_.lower() == "mark" and _locution_match(tok, causes_norm):
+                head = tok.head
+                cause_span = doc[head.left_edge.i: head.right_edge.i+1]
+                enregs.append({
+                    "id_phrase": pid,
+                    "type": "CAUSE_SUBORDONNEE",
+                    "cause_span": cause_span.text,
+                    "consequence_span": sent.text,
+                    "ancre": tok.text,
+                    "methode": "mark→advcl",
+                    "phrase": sent.text
+                })
+
+        # Groupes prépositionnels causaux (à cause de, en raison de, du fait de, grâce à…)
+        for tok in sent:
+            if tok.dep_.lower() in {"case","fixed","mark"} and _locution_match(tok, causes_norm):
+                head = tok.head
+                gn = doc[head.left_edge.i: head.right_edge.i+1]
+                enregs.append({
+                    "id_phrase": pid,
+                    "type": "CAUSE_GN",
+                    "cause_span": gn.text,
+                    "consequence_span": sent.text,
+                    "ancre": tok.text,
+                    "methode": "case/fixed→obl",
+                    "phrase": sent.text
+                })
+
+        # Conséquence adverbiale en tête de phrase (donc, alors, ainsi, dès lors…)
+        premiers = [t for t in sent if not t.is_punct][:3]
+        if premiers:
+            t0 = premiers[0]
+            if _locution_match(t0, consq_norm) and t0.pos_ in {"ADV","CCONJ","SCONJ"}:
+                enregs.append({
+                    "id_phrase": pid,
+                    "type": "CONSEQUENCE_ADV",
+                    "cause_span": prev_sent_text,
+                    "consequence_span": sent.text,
+                    "ancre": t0.text,
+                    "methode": "adv/discourse tête de phrase",
+                    "phrase": sent.text
+                })
+
+        # Subordonnées consécutives (de sorte que, si bien que, de façon que…)
+        for tok in sent:
+            if tok.dep_.lower() == "mark" and _locution_match(tok, consq_norm):
+                head = tok.head
+                cons_span = doc[head.left_edge.i: head.right_edge.i+1]
+                enregs.append({
+                    "id_phrase": pid,
+                    "type": "CONSEQUENCE_SUBORDONNEE",
+                    "cause_span": sent.text,
+                    "consequence_span": cons_span.text,
+                    "ancre": tok.text,
+                    "methode": "mark→advcl(consécutif)",
+                    "phrase": sent.text
+                })
+
+        prev_sent_text = sent.text
+
+    df = pd.DataFrame(enregs)
+    if not df.empty:
+        df = df.sort_values(["id_phrase", "type"]).reset_index(drop=True)
+    return df
 
 # =========================
-# Interface
+# Helpers pour tableaux comparatifs (surlignage ⟦ … ⟧)
 # =========================
+def marquer_terme_brut(phrase: str, terme: str) -> str:
+    """Entoure la 1ère occurrence de 'terme' par ⟦…⟧ (insensible à la casse), sans HTML."""
+    if not phrase or not terme:
+        return phrase or ""
+    m = re.search(re.escape(terme), phrase, flags=re.I)
+    if not m:
+        return phrase
+    i, j = m.start(), m.end()
+    return phrase[:i] + "⟦" + phrase[i:j] + "⟧" + phrase[j:]
 
-st.set_page_config(page_title="Discours → Code (Python) & Marqueurs normatifs", page_icon=None, layout="wide")
-st.title("Analyse d’un discours comme du code : IF / ELSE / WHILE / AND / OR + marqueurs (regex)")
+def table_regex_df(df: pd.DataFrame, type_marqueur: str) -> pd.DataFrame:
+    """
+    Construit un DataFrame pour l’affichage Streamlit :
+      - type_marqueur = "CAUSE"  -> colonne clé = 'cause'
+      - type_marqueur = "CONSEQUENCE" -> colonne clé = 'consequence'
+    Ajoute 'phrase_marquee' avec le marqueur entouré de ⟦…⟧.
+    """
+    if df is None or df.empty:
+        return pd.DataFrame(columns=["id_phrase", "marqueur", "catégorie", "phrase_marquee"])
 
+    cle = "cause" if type_marqueur.upper() == "CAUSE" else "consequence"
+    lignes = []
+    for _, row in df.iterrows():
+        marqueur = row.get(cle, "")
+        cat = row.get("categorie", "")
+        phr = row.get("phrase", "")
+        phr_m = marquer_terme_brut(phr, marqueur)
+        lignes.append({
+            "id_phrase": row.get("id_phrase", ""),
+            "marqueur": marqueur,
+            "catégorie": cat,
+            "phrase_marquee": phr_m
+        })
+    return pd.DataFrame(lignes)
+
+def table_spacy_df(df_spacy: pd.DataFrame) -> pd.DataFrame:
+    """
+    Construit un DataFrame pour l’affichage Streamlit côté spaCy :
+    Colonnes : id_phrase, type, ancre, méthode, phrase_marquee, cause_span, consequence_span
+    (l’ancre est entourée de ⟦…⟧ dans la phrase).
+    """
+    if df_spacy is None or df_spacy.empty:
+        return pd.DataFrame(columns=["id_phrase", "type", "ancre", "méthode", "phrase_marquee", "cause_span", "consequence_span"])
+
+    lignes = []
+    for _, row in df_spacy.iterrows():
+        ancre = row.get("ancre", "")
+        phr = row.get("phrase", "")
+        phr_m = marquer_terme_brut(phr, ancre)
+        lignes.append({
+            "id_phrase": row.get("id_phrase", ""),
+            "type": row.get("type", ""),
+            "ancre": ancre,
+            "méthode": row.get("methode", ""),
+            "phrase_marquee": phr_m,
+            "cause_span": row.get("cause_span", ""),
+            "consequence_span": row.get("consequence_span", "")
+        })
+    return pd.DataFrame(lignes)
+
+# =========================
+# Interface Streamlit
+# =========================
+st.set_page_config(page_title="Discours → Code (Regex vs spaCy + JSON racine)", page_icon=None, layout="wide")
+st.title("Discours → Code : IF / ELSE / WHILE / AND / OR + marqueurs + causes/conséquences (Regex vs spaCy)")
+
+# Chargement des dicos
+try:
+    DICO_CONNECTEURS, DICO_MARQUEURS, DICO_CONSQS, DICO_CAUSES = charger_tous_les_dicos()
+except Exception as e:
+    st.error("Impossible de charger les dictionnaires JSON à la racine.")
+    st.code(str(e))
+    st.stop()
+
+# Alerte spaCy/Graphviz
+if not SPACY_OK:
+    st.warning("spaCy FR indisponible (transformer préféré, fallback md si disponible). L’onglet spaCy utilisera uniquement Regex si aucun modèle FR n’est chargé.")
+if not GV_OK:
+    st.warning("Graphviz non détecté : l’export JPEG des graphes ne sera pas disponible (rendu DOT affiché quand même).")
+
+# Barre latérale : choix méthodes
 with st.sidebar:
-    st.header("Options d’analyse")
-    opt_ne_sans_pas = st.checkbox("Considérer « ne … peut » sans « pas » comme négation", value=False,
-                                  help="Utile si le texte a perdu des « pas » ; ignore « peut-être ».")
-    st.markdown("---")
-
-    st.header("Connecteurs (expression française → famille Python)")
-    dico_conn = st.session_state["dico_mot_vers_code"]
-    nouv_mot = st.text_input("Ajouter une expression (connecteur)")
-    nouv_code = st.selectbox("Famille Python", ["IF","ELSE","WHILE","AND","OR"])
-    if st.button("Ajouter le connecteur"):
-        if nouv_mot:
-            cle = normaliser_espace(nouv_mot.lower())
-            dico_conn[cle] = str(nouv_code).upper()
-            st.session_state["dico_mot_vers_code"] = dico_conn
-            st.success(f"Ajouté : « {nouv_mot} » → {nouv_code}")
-
-    st.download_button("Télécharger connecteurs (JSON)",
-                       data=json.dumps(st.session_state["dico_mot_vers_code"], ensure_ascii=False, indent=2).encode("utf-8"),
-                       file_name="dictionnaire_connecteurs.json", mime="application/json",
-                       key="dl_conn_json_sidebar")
-
-    st.divider()
-    st.header("Marqueurs normatifs (dictionnaire enrichi)")
-    dico_norm = st.session_state["dico_marqueurs"]
-    nouv_marq = st.text_input("Ajouter une expression (normatif)")
-    cat_marq = st.selectbox("Catégorie", ["OBLIGATION","INTERDICTION","PERMISSION","RECOMMANDATION","SANCTION","CADRE_OUVERTURE","CADRE_FERMETURE"])
-    if st.button("Ajouter le marqueur normatif"):
-        if nouv_marq:
-            cle = normaliser_espace(nouv_marq.lower())
-            dico_norm[cle] = str(cat_marq).upper()
-            st.session_state["dico_marqueurs"] = dico_norm
-            st.success(f"Ajouté : « {nouv_marq} » → {cat_marq}")
-
-    st.download_button("Télécharger marqueurs (JSON)",
-                       data=json.dumps(st.session_state["dico_marqueurs"], ensure_ascii=False, indent=2).encode("utf-8"),
-                       file_name="dictionnaire_marqueurs.json", mime="application/json",
-                       key="dl_marq_json_sidebar")
+    st.header("Méthodes d’analyse")
+    use_regex_cc = st.checkbox("Causalité par Regex (dictionnaires JSON)", value=True)
+    use_spacy_cc = st.checkbox("Causalité par spaCy (analyse NLP)", value=SPACY_OK)
 
 # Source du discours
 st.markdown("### Source du discours")
-mode_source = st.radio("Choisir la source du texte", options=["Fichier .txt", "Zone de texte"], index=0, horizontal=True)
+mode_source = st.radio("Choisir la source du texte", ["Fichier .txt", "Zone de texte"], index=0, horizontal=True)
 
 texte_source = ""
 if mode_source == "Fichier .txt":
@@ -681,39 +719,39 @@ else:
 
 st.divider()
 
-# Préparer les détections
+# Détections de base
 if texte_source.strip():
-    df_conn = detecter_connecteurs(texte_source, st.session_state["dico_mot_vers_code"])
-    df_norm_brut = detecter_marqueurs_normatifs(texte_source, st.session_state["dico_marqueurs"])
-    df_norm = ajuster_negations_global(texte_source, df_norm_brut, treat_ne_sans_pas_as_neg=opt_ne_sans_pas)
+    df_conn = detecter_connecteurs(texte_source, DICO_CONNECTEURS)
+    df_marq_brut = detecter_marqueurs(texte_source, DICO_MARQUEURS)
+    df_marq = ajuster_negations_global(texte_source, df_marq_brut)
+    df_consq_lex = detecter_consequences_lex(texte_source, DICO_CONSQS) if use_regex_cc else pd.DataFrame()
+    df_causes_lex = detecter_causes_lex(texte_source, DICO_CAUSES) if use_regex_cc else pd.DataFrame()
 else:
     df_conn = pd.DataFrame()
-    df_norm = pd.DataFrame()
+    df_marq = pd.DataFrame()
+    df_consq_lex = pd.DataFrame()
+    df_causes_lex = pd.DataFrame()
 
 # Onglets
-ong1, ong2, ong3, ong4, ong5 = st.tabs([
-    "Expressions mappées", "Détections", "Dictionnaires (JSON)", "Guide d’interprétation", "Graphiques (IF / WHILE)"
+ong1, ong2, ong3, ong4, ong5, ong6 = st.tabs([
+    "Expressions mappées", "Détections", "Dictionnaires (JSON)", "Guide d’interprétation", "Graphiques (IF / WHILE)", "Comparatif Regex / spaCy"
 ])
 
 # Onglet 1 : Expressions mappées
 with ong1:
     st.subheader("Expressions françaises mappées vers une famille Python (if / else / while / and / or)")
-    dico_conn = st.session_state["dico_mot_vers_code"]
-    if not dico_conn:
-        st.info("Le dictionnaire des connecteurs est vide.")
+    if not DICO_CONNECTEURS:
+        st.info("Aucun connecteur chargé.")
     else:
-        df_map = pd.DataFrame(sorted([(k, v) for k, v in dico_conn.items()], key=lambda x: (x[1], x[0])),
+        df_map = pd.DataFrame(sorted([(k, v) for k, v in DICO_CONNECTEURS.items()], key=lambda x: (x[1], x[0])),
                               columns=["expression_française", "famille_python"])
         st.dataframe(df_map, use_container_width=True, hide_index=True)
         st.download_button("Exporter le mappage (CSV)",
                            data=df_map.to_csv(index=False).encode("utf-8"),
                            file_name="mapping_connecteurs.csv", mime="text/csv",
-                           key="dl_map_csv")
+                           key="dl_map_connecteurs_csv")
 
-    st.subheader("Explication des marqueurs normatifs (dictionnaire enrichi)")
-    st.write("Les marqueurs normatifs détectent les segments prescriptifs : OBLIGATION, INTERDICTION, PERMISSION, RECOMMANDATION, SANCTION, ainsi que l’ouverture/fermeture du cadre de débat.")
-
-# Onglet 2 : Détections + texte annoté
+# Onglet 2 : Détections (listes + texte annoté)
 with ong2:
     st.subheader("Connecteurs détectés")
     if df_conn.empty:
@@ -725,21 +763,49 @@ with ong2:
                            file_name="occurrences_connecteurs.csv", mime="text/csv",
                            key="dl_occ_conn_csv")
 
-    st.subheader("Marqueurs normatifs détectés (après ajustements)")
-    if df_norm.empty:
-        st.info("Aucun marqueur normatif détecté ou aucun texte fourni.")
+    st.subheader("Marqueurs détectés (après ajustements de négation autour de « pouvoir »)")
+    if df_marq.empty:
+        st.info("Aucun marqueur détecté.")
     else:
-        st.dataframe(df_norm, use_container_width=True, hide_index=True)
-        st.download_button("Exporter marqueurs normatifs (CSV)",
-                           data=df_norm.to_csv(index=False).encode("utf-8"),
-                           file_name="occurrences_marqueurs_normatifs.csv", mime="text/csv",
+        st.dataframe(df_marq, use_container_width=True, hide_index=True)
+        st.download_button("Exporter marqueurs (CSV)",
+                           data=df_marq.to_csv(index=False).encode("utf-8"),
+                           file_name="occurrences_marqueurs.csv", mime="text/csv",
                            key="dl_occ_marq_csv")
 
-    st.markdown("---")
-    st.subheader("Texte annoté")
-    st.caption("Affiche les connecteurs Python existants : IF (si), ELSE (sinon), WHILE (tant que), AND (et), OR (ou).")
+    colX, colY = st.columns(2)
+    with colX:
+        st.subheader("Déclencheurs de conséquence (Regex)")
+        if not use_regex_cc:
+            st.info("Méthode Regex désactivée (voir barre latérale).")
+        else:
+            if df_consq_lex.empty:
+                st.info("Aucun déclencheur de conséquence détecté par Regex.")
+            else:
+                st.dataframe(df_consq_lex, use_container_width=True, hide_index=True)
+                st.download_button("Exporter conséquences (CSV)",
+                                   data=df_consq_lex.to_csv(index=False).encode("utf-8"),
+                                   file_name="occurrences_consequences.csv", mime="text/csv",
+                                   key="dl_occ_consq_csv")
+    with colY:
+        st.subheader("Déclencheurs de cause (Regex)")
+        if not use_regex_cc:
+            st.info("Méthode Regex désactivée (voir barre latérale).")
+        else:
+            if df_causes_lex.empty:
+                st.info("Aucun déclencheur de cause détecté par Regex.")
+            else:
+                st.dataframe(df_causes_lex, use_container_width=True, hide_index=True)
+                st.download_button("Exporter causes (CSV)",
+                                   data=df_causes_lex.to_csv(index=False).encode("utf-8"),
+                                   file_name="occurrences_causes.csv", mime="text/csv",
+                                   key="dl_occ_causes_csv")
 
-    colA, colB, colC, colD, colE = st.columns(5)
+    st.markdown("---")
+    st.subheader("Texte annoté (filtres par familles)")
+
+    # Cases à cocher pour les familles de connecteurs et marqueurs
+    colA, colB, colC, colD, colE, colF, colG, colH = st.columns(8)
     with colA:
         show_if = st.checkbox("IF (si)", value=True)
     with colB:
@@ -750,11 +816,15 @@ with ong2:
         show_and = st.checkbox("AND (et)", value=True)
     with colE:
         show_or = st.checkbox("OR (ou)", value=True)
+    with colF:
+        show_marqueurs = st.checkbox("Marqueurs (hors CAUSE/CONSEQUENCE)", value=True)
+    with colG:
+        show_consequences = st.checkbox("CONSEQUENCE", value=True)
+    with colH:
+        show_causes = st.checkbox("CAUSE", value=True)
 
-    show_marqueurs = st.checkbox("Afficher les marqueurs normatifs", value=True)
-    filt_marq = st.multiselect("Limiter aux catégories de marqueurs (optionnel)",
-                               ["OBLIGATION","INTERDICTION","PERMISSION","RECOMMANDATION","SANCTION","CADRE_OUVERTURE","CADRE_FERMETURE"],
-                               default=[])
+    categories_disponibles = sorted(list(FAMILLES_MARQUEURS_STANDARD))
+    filt_marq = st.multiselect("Limiter aux catégories de marqueurs (optionnel)", categories_disponibles, default=[])
 
     show_codes = {"IF": show_if, "ELSE": show_else, "WHILE": show_while, "AND": show_and, "OR": show_or}
 
@@ -765,10 +835,14 @@ with ong2:
     else:
         frag = html_annote(
             texte_source,
-            st.session_state["dico_mot_vers_code"],
-            st.session_state["dico_marqueurs"],
+            DICO_CONNECTEURS,
+            DICO_MARQUEURS,
+            DICO_CONSQS if show_consequences else {},
+            DICO_CAUSES if show_causes else {},
             show_codes=show_codes,
             show_marqueurs=show_marqueurs,
+            show_consequences=show_consequences,
+            show_causes=show_causes,
             filtres_marqueurs=filt_marq
         )
         st.markdown(frag, unsafe_allow_html=True)
@@ -779,71 +853,70 @@ with ong2:
 
 # Onglet 3 : Dictionnaires (JSON)
 with ong3:
-    sous1, sous2 = st.tabs(["Connecteurs (JSON)", "Marqueurs normatifs (JSON)"])
-    with sous1:
-        st.json(st.session_state["dico_mot_vers_code"], expanded=False)
-        st.download_button("Télécharger connecteurs (JSON)",
-                           data=json.dumps(st.session_state["dico_mot_vers_code"], ensure_ascii=False, indent=2).encode("utf-8"),
-                           file_name="dictionnaire_connecteurs.json", mime="application/json",
-                           key="dl_conn_json_tab")
-    with sous2:
-        st.json(st.session_state["dico_marqueurs"], expanded=False)
-        st.download_button("Télécharger marqueurs (JSON)",
-                           data=json.dumps(st.session_state["dico_marqueurs"], ensure_ascii=False, indent=2).encode("utf-8"),
-                           file_name="dictionnaire_marqueurs.json", mime="application/json",
-                           key="dl_marq_json_tab")
+    st.subheader("Aperçu des dictionnaires chargés (racine)")
+    st.markdown("**dic_code.json**")
+    st.json(DICO_CONNECTEURS, expanded=False)
+    st.markdown("**dict_marqueurs.json**")
+    st.json(DICO_MARQUEURS, expanded=False)
+    st.markdown("**consequences.json**")
+    st.json(DICO_CONSQS, expanded=False)
+    st.markdown("**causes.json**")
+    st.json(DICO_CAUSES, expanded=False)
 
-# Onglet 4 : Guide d’interprétation (détaillé)
+# Onglet 4 : Guide d’interprétation
 with ong4:
     st.subheader("Guide d’interprétation : Python vs analyse de discours")
 
     st.markdown("#### IF")
     st.write(
         "Cadre Python : `if` introduit une condition booléenne ; le bloc indenté s’exécute si la condition est vraie. "
-        "On enchaîne souvent `elif` (autres cas) puis `else` (cas par défaut). "
-        "La condition doit évaluer à `True`/`False` (truthy/falsy admis). "
-        "Exemples : `if x > 0:`, `if user and is_admin:`.\n\n"
-        "Cadre analyse : « si », « à condition que », « pourvu que », « au cas où » posent une **condition d’acceptabilité** "
-        "ou de **mise en œuvre**. Repérer ces formes révèle les clauses de contingence des engagements."
+        "On peut enchaîner `elif` puis `else` ; la condition évalue `True/False` (valeurs truthy/falsy admises).\n\n"
+        "Cadre analyse : « si », « à condition que », « pourvu que », « au cas où » posent une condition d’acceptabilité ou de mise en œuvre."
     )
 
     st.markdown("#### ELSE")
     st.write(
-        "Cadre Python : `else` est la branche alternative quand la condition précédente est fausse ; elle couvre le « reste ».\n\n"
-        "Cadre analyse : « sinon » marque l’**alternative par défaut** ou un **coût** si la condition n’est pas remplie."
+        "Cadre Python : `else` est la branche alternative quand la condition est fausse.\n\n"
+        "Cadre analyse : « sinon », « autrement », « à défaut » marquent l’alternative par défaut ou le coût si la condition n’est pas remplie."
     )
 
     st.markdown("#### WHILE")
     st.write(
-        "Cadre Python : `while` répète un bloc tant que l’expression reste vraie ; `break` sort, `continue` saute à l’itération suivante.\n\n"
-        "Cadre analyse : « tant que » exprime une **persistance conditionnelle** (maintien d’une action tant qu’un état perdure)."
+        "Cadre Python : `while` répète un bloc tant que l’expression reste vraie ; `break` sort ; `continue` saute l’itération suivante.\n\n"
+        "Cadre analyse : « tant que » exprime une persistance conditionnelle (maintien d’une action tant qu’un état perdure)."
     )
 
     st.markdown("#### AND")
     st.write(
-        "Cadre Python : `and` exige que toutes les sous-conditions soient vraies ; court-circuit.\n\n"
-        "Cadre analyse : « et », « ainsi que » **agrègent** des critères/engagements pour construire un **front commun**."
+        "Cadre Python : `and` exige que toutes les sous-conditions soient vraies (court-circuit logique).\n\n"
+        "Cadre analyse : « et », « ainsi que » agrègent des critères/engagements pour construire un front commun."
     )
 
     st.markdown("#### OR")
     st.write(
-        "Cadre Python : `or` est vrai si au moins une sous-condition est vraie ; court-circuit.\n\n"
-        "Cadre analyse : « ou », « ou bien », « soit » posent des **alternatives**."
+        "Cadre Python : `or` vaut vrai si au moins une sous-condition est vraie (court-circuit).\n\n"
+        "Cadre analyse : « ou », « ou bien », « soit » posent des alternatives."
     )
 
     st.markdown("#### Négation et verbe « pouvoir »")
     st.write(
-        "Reclassement automatique des formes « ne … peut/peuvent/pourra/pourront (pas/plus/jamais) » en **INTERDICTION**. "
-        "Option pour traiter l’ellipse « ne … peut » (sans « pas ») en négation, sauf « peut-être »."
+        "Reclassement automatique des formes « ne … peut/peuvent/pourra/pourront (pas/plus/jamais) » en **INTERDICTION** (regex). "
+        "Cet ajustement évite de classer « ne peut » comme permission."
     )
 
-    st.markdown("#### Marqueurs normatifs")
+    st.markdown("#### Déclencheurs de conséquence (CONSEQUENCE)")
     st.write(
-        "OBLIGATION / INTERDICTION / PERMISSION / RECOMMANDATION / SANCTION / CADRE_OUVERTURE / CADRE_FERMETURE : "
-        "lecture pragmatique de qui contraint qui, des coûts/menaces et du cadre d’échange."
+        "Repères pour l’apodose : « donc », « alors », « c’est pourquoi », "
+        "« par conséquent », « de ce fait », « ainsi », « dès lors », « en conséquence », etc."
     )
 
-# Onglet 5 : Graphiques (IF / WHILE) — affichage direct + export JPEG si possible
+    st.markdown("#### Déclencheurs de cause (CAUSE)")
+    st.write(
+        "Repères qui motivent/justifient un fait : « parce que », « car », « puisque », « comme » (en tête), "
+        "« en raison de », « du fait que », « à cause de », « grâce à », « faute de », « suite à », etc."
+    )
+
+# Onglet 5 : Graphiques (IF / WHILE)
 with ong5:
     st.subheader("Boucles WHILE détectées")
     if not texte_source.strip():
@@ -881,8 +954,9 @@ with ong5:
                     st.write(sel["phrase"])
                 st.markdown("---")
 
-        st.subheader("Conditions IF détectées")
-        seg_if = extraire_segments_if(texte_source)
+        st.subheader("Conditions IF détectées (toutes occurrences)")
+        df_consq_for_if = df_consq_lex if not df_consq_lex.empty else pd.DataFrame()
+        seg_if = extraire_segments_if(texte_source, df_consq_for_if)
         if not seg_if:
             st.info("Aucune condition « si … » détectée.")
         else:
@@ -916,3 +990,62 @@ with ong5:
                 with st.expander("Voir la phrase complète"):
                     st.write(sel["phrase"])
                 st.markdown("---")
+
+# Onglet 6 : Comparatif Regex / spaCy
+with ong6:
+    st.subheader("Comparatif des détections Causes/Conséquences : Regex vs spaCy")
+
+    if not texte_source.strip():
+        st.info("Aucun texte fourni.")
+    else:
+        # 1) Regex — CAUSE
+        st.markdown("**Détections Regex — CAUSE**")
+        if not use_regex_cc:
+            st.info("Méthode Regex désactivée (voir barre latérale).")
+        else:
+            if df_causes_lex.empty:
+                st.info("Aucune CAUSE trouvée par Regex.")
+            else:
+                df_view_cause = table_regex_df(df_causes_lex, "CAUSE")
+                st.dataframe(df_view_cause, use_container_width=True, hide_index=True)
+
+        st.markdown("---")
+
+        # 2) Regex — CONSEQUENCE
+        st.markdown("**Détections Regex — CONSEQUENCE**")
+        if not use_regex_cc:
+            st.info("Méthode Regex désactivée (voir barre latérale).")
+        else:
+            if df_consq_lex.empty:
+                st.info("Aucune CONSEQUENCE trouvée par Regex.")
+            else:
+                df_view_consq = table_regex_df(df_consq_lex, "CONSEQUENCE")
+                st.dataframe(df_view_consq, use_container_width=True, hide_index=True)
+
+        st.markdown("---")
+
+        # 3) spaCy — CAUSE → CONSÉQUENCE
+        st.markdown("**Détections spaCy — CAUSE → CONSÉQUENCE**")
+        if use_spacy_cc and SPACY_OK and NLP is not None:
+            df_cc_spacy = extraire_cause_consequence_spacy(
+                texte_source,
+                NLP,
+                list(DICO_CAUSES.keys()),
+                list(DICO_CONSQS.keys())
+            )
+            if df_cc_spacy.empty:
+                st.info("Aucun lien trouvé par spaCy (selon les ancres fournies).")
+            else:
+                df_spacy_view = table_spacy_df(df_cc_spacy)
+                st.dataframe(df_spacy_view, use_container_width=True, hide_index=True)
+                st.download_button(
+                    "Exporter CAUSE → CONSÉQUENCE (CSV)",
+                    data=df_spacy_view.to_csv(index=False).encode("utf-8"),
+                    file_name="cause_consequence_spacy.csv",
+                    mime="text/csv",
+                    key="dl_cc_spacy_csv"
+                )
+        elif use_spacy_cc and not SPACY_OK:
+            st.warning("spaCy FR indisponible (installez un modèle français, idéalement transformer).")
+        else:
+            st.info("spaCy désactivé (voir la barre latérale).")
