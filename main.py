@@ -42,19 +42,46 @@ def rendre_jpeg_depuis_dot(dot_str: str) -> bytes:
 # =========================
 SPACY_OK = False
 NLP = None
+SPACY_STATUS: List[str] = []
 try:
     import spacy
-    # Essais : un modèle FR transformer, puis fallback sur fr_core_news_md
-    for name in ("fr_dep_news_trf", "fr_core_news_trf", "fr_core_news_md"):
+    from spacy.cli import download as spacy_download
+
+    def _charger_modele_spacy(nom_modele: str) -> Any:
+        """Tente de charger (et télécharger au besoin) un modèle spaCy FR."""
         try:
-            NLP = spacy.load(name)
+            return spacy.load(nom_modele)
+        except OSError as err:
+            # Modèle non installé → tentative de téléchargement automatique
+            try:
+                spacy_download(nom_modele)
+                return spacy.load(nom_modele)
+            except Exception as dl_err:
+                SPACY_STATUS.append(
+                    f"Téléchargement du modèle spaCy '{nom_modele}' impossible : {dl_err}"
+                )
+                SPACY_STATUS.append(
+                    f"Erreur initiale lors du chargement de '{nom_modele}' : {err}"
+                )
+        except Exception as err:
+            SPACY_STATUS.append(
+                f"Chargement du modèle spaCy '{nom_modele}' impossible : {err}"
+            )
+        return None
+
+    for name in ("fr_dep_news_trf", "fr_core_news_trf", "fr_core_news_md"):
+        modele = _charger_modele_spacy(name)
+        if modele is not None:
+            NLP = modele
             SPACY_OK = True
+            SPACY_STATUS.append(f"Modèle spaCy chargé : {name}")
             break
-        except Exception:
-            continue
-except Exception:
+    if not SPACY_OK:
+        SPACY_STATUS.append("Aucun modèle spaCy FR n'a pu être chargé.")
+except Exception as err:
     SPACY_OK = False
     NLP = None
+    SPACY_STATUS.append(f"Import de spaCy impossible : {err}")
 
 # =========================
 # Palettes / libellés Python (affichage)
@@ -691,7 +718,11 @@ except Exception as e:
 
 # Alerte spaCy/Graphviz
 if not SPACY_OK:
-    st.warning("spaCy FR indisponible (transformer préféré, fallback md si disponible). L’onglet spaCy utilisera uniquement Regex si aucun modèle FR n’est chargé.")
+    st.warning(
+        "spaCy FR indisponible (transformer préféré, fallback md si disponible). L’onglet spaCy utilisera uniquement Regex si aucun modèle FR n’est chargé."
+    )
+if SPACY_STATUS:
+    st.caption(" ; ".join(SPACY_STATUS))
 if not GV_OK:
     st.warning("Graphviz non détecté : l’export JPEG des graphes ne sera pas disponible (rendu DOT affiché quand même).")
 
