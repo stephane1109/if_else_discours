@@ -5,3 +5,6 @@ streamlit>=1.33,<2.0
 pandas>=2.2,<3.0
 graphviz>=0.20.3,<0.21
 Pillow>=9.5,<11.0
+spacy[transformers]>=3.7,<3.8
+# Modèle français transformer spaCy (FR_dep_news_trf)
+https://github.com/explosion/spacy-models/releases/download/fr_dep_news_trf-3.7.0/fr_dep_news_trf-3.7.0.tar.gz#egg=fr_dep_news_trf
