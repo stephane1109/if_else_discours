@@ -16,4 +16,4 @@ click==8.1.7
 # Backend transformer PyTorch
 torch
 # Modèle français transformer spaCy (fr_core_news_trf)
-https://github.com/explosion/spacy-models/releases/download/fr_core_news_trf-3.7.4/fr_core_news_trf-3.7.4.tar.gz#egg=fr_core_news_trf
+https://github.com/explosion/spacy-models/releases/download/fr_core_news_trf-3.7.3/fr_core_news_trf-3.7.3.tar.gz#egg=fr_core_news_trf
