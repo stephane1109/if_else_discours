@@ -10,5 +10,8 @@ Pillow>=9.5,<11.0
 # On force donc explicitement l'installation du module spaCy Transformers.
 spacy>=3.7,<3.8
 spacy-transformers>=1.3.4,<1.4
-# Modèle français transformer spaCy (FR_dep_news_trf)
+# Modèles français spaCy pré-téléchargés pour éviter les téléchargements à l'exécution.
+#   - Transformer (fr_dep_news_trf) — peut échouer sur des plateformes à ressources limitées
+#   - Medium (fr_core_news_md)      — fallback plus léger si le transformer n'est pas disponible
 https://github.com/explosion/spacy-models/releases/download/fr_dep_news_trf-3.7.0/fr_dep_news_trf-3.7.0.tar.gz#egg=fr_dep_news_trf
+https://github.com/explosion/spacy-models/releases/download/fr_core_news_md-3.7.0/fr_core_news_md-3.7.0-py3-none-any.whl#egg=fr_core_news_md
