@@ -351,14 +351,17 @@ def html_annote(texte: str,
                 dico_consq: Dict[str, str],
                 dico_causes: Dict[str, str],
                 show_codes: Dict[str, bool],
-                show_marqueurs: bool,
                 show_consequences: bool,
                 show_causes: bool,
-                filtres_marqueurs: List[str] = None) -> str:
+                show_marqueurs_categories: Dict[str, bool] = None) -> str:
     """Produit le HTML annoté selon les cases cochées."""
     if not texte:
         return "<div class='texte-annote'>(Texte vide)</div>"
-    filtres_marqueurs = set([c.upper() for c in (filtres_marqueurs or [])])
+    if show_marqueurs_categories is not None:
+        show_marqueurs_categories = {
+            str(cat).upper(): bool(val)
+            for cat, val in show_marqueurs_categories.items()
+        }
 
     t = texte
     occ = occurrences_mixte(t, dico_conn, dico_marq, dico_consq, dico_causes)
@@ -370,10 +373,8 @@ def html_annote(texte: str,
             if not show_codes.get(code, True):
                 continue
         elif m["type"] == "marqueur":
-            if not show_marqueurs:
-                continue
             cat = str(m["etiquette"]).upper()
-            if filtres_marqueurs and cat not in filtres_marqueurs:
+            if show_marqueurs_categories is not None and not show_marqueurs_categories.get(cat, True):
                 continue
         elif m["type"] == "consequence":
             if not show_consequences:
@@ -836,7 +837,7 @@ with ong2:
     st.subheader("Texte annoté (filtres par familles)")
 
     # Cases à cocher pour les familles de connecteurs et marqueurs
-    colA, colB, colC, colD, colE, colF, colG, colH = st.columns(8)
+    colA, colB, colC, colD, colE = st.columns(5)
     with colA:
         show_if = st.checkbox("IF (si)", value=True)
     with colB:
@@ -847,17 +848,32 @@ with ong2:
         show_and = st.checkbox("AND (et)", value=True)
     with colE:
         show_or = st.checkbox("OR (ou)", value=True)
-    with colF:
-        show_marqueurs = st.checkbox("Marqueurs (hors CAUSE/CONSEQUENCE)", value=True)
-    with colG:
-        show_consequences = st.checkbox("CONSEQUENCE", value=True)
-    with colH:
-        show_causes = st.checkbox("CAUSE", value=True)
-
-    categories_disponibles = sorted(list(FAMILLES_MARQUEURS_STANDARD))
-    filt_marq = st.multiselect("Limiter aux catégories de marqueurs (optionnel)", categories_disponibles, default=[])
 
     show_codes = {"IF": show_if, "ELSE": show_else, "WHILE": show_while, "AND": show_and, "OR": show_or}
+
+    categories_normatives = sorted({str(v).upper() for v in DICO_MARQUEURS.values()})
+    show_marqueurs_categories: Dict[str, bool] = {}
+    if categories_normatives:
+        st.markdown("**Marqueurs normatifs**")
+        nb_cols = min(4, len(categories_normatives)) or 1
+        for start in range(0, len(categories_normatives), nb_cols):
+            cols = st.columns(nb_cols)
+            for col, cat in zip(cols, categories_normatives[start:start + nb_cols]):
+                label = cat.replace("_", " ")
+                with col:
+                    show_marqueurs_categories[cat] = st.checkbox(
+                        label,
+                        value=True,
+                        key=f"chk_marqueur_{cat.lower()}"
+                    )
+    else:
+        show_marqueurs_categories = None
+
+    col_consq, col_caus = st.columns(2)
+    with col_consq:
+        show_consequences = st.checkbox("CONSEQUENCE", value=True)
+    with col_caus:
+        show_causes = st.checkbox("CAUSE", value=True)
 
     st.markdown(css_badges(), unsafe_allow_html=True)
     if not texte_source.strip():
@@ -871,10 +887,9 @@ with ong2:
             DICO_CONSQS if show_consequences else {},
             DICO_CAUSES if show_causes else {},
             show_codes=show_codes,
-            show_marqueurs=show_marqueurs,
+            show_marqueurs_categories=show_marqueurs_categories,
             show_consequences=show_consequences,
-            show_causes=show_causes,
-            filtres_marqueurs=filt_marq
+            show_causes=show_causes
         )
         st.markdown(frag, unsafe_allow_html=True)
         st.download_button("Exporter le texte annoté (HTML)",
