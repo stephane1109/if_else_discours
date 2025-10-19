@@ -5,6 +5,7 @@ from typing import Dict
 
 import pandas as pd
 import streamlit as st
+import altair as alt
 
 
 def _value_counts(df: pd.DataFrame, column: str) -> pd.DataFrame:
@@ -92,6 +93,28 @@ def render_stats_tab(df_marqueurs: pd.DataFrame) -> None:
         chart_data = counts_cat.set_index("categorie")
         st.bar_chart(chart_data)
 
+    st.markdown("### Fréquence de tous les marqueurs")
+    counts_marqueurs = _value_counts(df, "marqueur")
+    if counts_marqueurs.empty:
+        st.info("Impossible de calculer la fréquence des marqueurs.")
+    else:
+        st.dataframe(counts_marqueurs, use_container_width=True, hide_index=True)
+        hauteur = max(200, 22 * len(counts_marqueurs))
+        chart_marqueurs = (
+            alt.Chart(counts_marqueurs)
+            .mark_bar()
+            .encode(
+                y=alt.Y("marqueur:N", sort="-x", title="Marqueur"),
+                x=alt.X("occurrences:Q", title="Occurrences"),
+                tooltip=[
+                    alt.Tooltip("marqueur:N", title="Marqueur"),
+                    alt.Tooltip("occurrences:Q", title="Occurrences"),
+                ],
+            )
+            .properties(height=hauteur)
+        )
+        st.altair_chart(chart_marqueurs, use_container_width=True)
+
     st.markdown("### Marqueurs les plus fréquents par catégorie")
     repartition = _marqueurs_par_categorie(df)
     if not repartition:
@@ -105,7 +128,7 @@ def render_stats_tab(df_marqueurs: pd.DataFrame) -> None:
     st.markdown("---")
 
     if "id_phrase" in df.columns:
-        st.markdown("### Intensité par phrase")
+        st.markdown("### Chronologie de la fréquence d'apparition")
         intensite = (
             df.groupby("id_phrase")
             .size()
@@ -114,5 +137,45 @@ def render_stats_tab(df_marqueurs: pd.DataFrame) -> None:
             .sort_values("occurrences", ascending=False, kind="mergesort")
         )
         st.dataframe(intensite, use_container_width=True, hide_index=True)
-        st.line_chart(intensite.set_index("id_phrase").sort_index())
+
+        chronologie = (
+            intensite.sort_values("id_phrase", ascending=True, kind="mergesort")
+            .reset_index(drop=True)
+        )
+        chronologie["occurrences_cumulees"] = chronologie["occurrences"].cumsum()
+
+        ligne = (
+            alt.Chart(chronologie)
+            .mark_line(point=True)
+            .encode(
+                x=alt.X(
+                    "id_phrase:Q",
+                    title="Phrase (ordre dans le texte)",
+                ),
+                y=alt.Y(
+                    "occurrences:Q",
+                    title="Occurrences par phrase",
+                ),
+                tooltip=[
+                    alt.Tooltip("id_phrase:Q", title="Phrase"),
+                    alt.Tooltip("occurrences:Q", title="Occurrences"),
+                    alt.Tooltip(
+                        "occurrences_cumulees:Q",
+                        title="Occurrences cumulées",
+                        format=",")
+                ],
+            )
+        )
+
+        zone = (
+            alt.Chart(chronologie)
+            .mark_area(opacity=0.25)
+            .encode(
+                x=alt.X("id_phrase:Q", title="Phrase (ordre dans le texte)"),
+                y=alt.Y("occurrences:Q", title="Occurrences par phrase"),
+            )
+        )
+
+        chronologie_chart = alt.layer(zone, ligne).properties(height=320).interactive()
+        st.altair_chart(chronologie_chart, use_container_width=True)
 
