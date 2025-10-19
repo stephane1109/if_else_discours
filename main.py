@@ -21,6 +21,8 @@ import pandas as pd
 import streamlit as st
 from typing import List, Dict, Tuple, Any
 
+from stats import render_stats_tab
+
 # =========================
 # Détection Graphviz (pour export JPEG)
 # =========================
@@ -787,8 +789,14 @@ else:
     df_causes_lex = pd.DataFrame()
 
 # Onglets
-ong1, ong2, ong3, ong4, ong5, ong6 = st.tabs([
-    "Expressions mappées", "Détections", "Dictionnaires (JSON)", "Guide d’interprétation", "Graphiques (IF / WHILE)", "Comparatif Regex / spaCy"
+ong1, ong2, ong3, ong4, ong5, ong6, ong_stats = st.tabs([
+    "Expressions mappées",
+    "Détections",
+    "Dictionnaires (JSON)",
+    "Guide d’interprétation",
+    "Graphiques (IF / WHILE)",
+    "Comparatif Regex / spaCy",
+    "Stats",
 ])
 
 # Onglet 1 : Expressions mappées
@@ -1101,3 +1109,7 @@ with ong6:
             st.warning("spaCy FR indisponible (installez un modèle français, idéalement transformer).")
         else:
             st.info("spaCy désactivé (voir la barre latérale).")
+
+# Onglet 7 : Statistiques sur les marqueurs
+with ong_stats:
+    render_stats_tab(df_marq)
