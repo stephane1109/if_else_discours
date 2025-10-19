@@ -856,46 +856,36 @@ with ong2:
                                    key="dl_occ_causes_csv")
 
     st.markdown("---")
-    st.subheader("Texte annoté (filtres par familles)")
+    st.subheader("Texte annoté")
 
     # Cases à cocher pour les familles de connecteurs et marqueurs
-    colA, colB, colC, colD, colE = st.columns(5)
-    with colA:
-        show_if = st.checkbox("IF (si)", value=True)
-    with colB:
-        show_else = st.checkbox("ELSE (sinon)", value=True)
-    with colC:
-        show_while = st.checkbox("WHILE (tant que)", value=True)
-    with colD:
-        show_and = st.checkbox("AND (et)", value=True)
-    with colE:
-        show_or = st.checkbox("OR (ou)", value=True)
-
-    show_codes = {"IF": show_if, "ELSE": show_else, "WHILE": show_while, "AND": show_and, "OR": show_or}
+    st.markdown("**Familles de connecteurs**")
+    show_codes = {}
+    for code, label in [
+        ("IF", "IF (si)"),
+        ("ELSE", "ELSE (sinon)"),
+        ("WHILE", "WHILE (tant que)"),
+        ("AND", "AND (et)"),
+        ("OR", "OR (ou)"),
+    ]:
+        show_codes[code] = st.checkbox(label, value=True, key=f"chk_code_{code.lower()}")
 
     categories_normatives = sorted({str(v).upper() for v in DICO_MARQUEURS.values()})
     show_marqueurs_categories: Dict[str, bool] = {}
     if categories_normatives:
         st.markdown("**Marqueurs normatifs**")
-        nb_cols = min(4, len(categories_normatives)) or 1
-        for start in range(0, len(categories_normatives), nb_cols):
-            cols = st.columns(nb_cols)
-            for col, cat in zip(cols, categories_normatives[start:start + nb_cols]):
-                label = cat.replace("_", " ")
-                with col:
-                    show_marqueurs_categories[cat] = st.checkbox(
-                        label,
-                        value=True,
-                        key=f"chk_marqueur_{cat.lower()}"
-                    )
+        for cat in categories_normatives:
+            label = cat.replace("_", " ")
+            show_marqueurs_categories[cat] = st.checkbox(
+                label,
+                value=True,
+                key=f"chk_marqueur_{cat.lower()}"
+            )
     else:
         show_marqueurs_categories = None
 
-    col_consq, col_caus = st.columns(2)
-    with col_consq:
-        show_consequences = st.checkbox("CONSEQUENCE", value=True)
-    with col_caus:
-        show_causes = st.checkbox("CAUSE", value=True)
+    show_consequences = st.checkbox("CONSEQUENCE", value=True, key="chk_consequence")
+    show_causes = st.checkbox("CAUSE", value=True, key="chk_cause")
 
     st.markdown(css_badges(), unsafe_allow_html=True)
     if not texte_source.strip():
