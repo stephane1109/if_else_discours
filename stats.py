@@ -147,7 +147,7 @@ def graphique_altair_chronologie(
             ),
             y=alt.Y("etiquette:N", title="Famille / Catégorie"),
             color=alt.Color("type:N", title="Type"),
-            shape=alt.Shape("type:N", title="Type"),
+            shape=alt.Shape("type:N", legend=None),
             size=alt.Size("longueur:Q", title="Longueur repérée", legend=None),
             tooltip=[
                 alt.Tooltip("t_rel:Q", title="Progression (%)", format=".2f"),
@@ -161,20 +161,7 @@ def graphique_altair_chronologie(
         .properties(height=320)
     )
 
-    dens = (
-        alt.Chart(data)
-        .transform_bin("bin_t", field="t_rel", bin=alt.Bin(maxbins=50))
-        .transform_aggregate(n="count()", groupby=["bin_t", "etiquette"])
-        .mark_bar(opacity=0.12)
-        .encode(
-            x=alt.X("bin_t:Q", title="", axis=alt.Axis(labels=False, ticks=False)),
-            y=alt.Y("n:Q", title="Densité relative", axis=alt.Axis(titleColor="#666")),
-            color=alt.Color("etiquette:N", legend=None),
-        )
-        .properties(height=80)
-    )
-
-    return alt.vconcat(base, dens).resolve_scale(color="independent")
+    return base
 
 
 def _value_counts(df: pd.DataFrame, column: str) -> pd.DataFrame:
@@ -307,7 +294,7 @@ def render_stats_tab(
     if df.empty:
         st.markdown("---")
 
-    st.markdown("### Chronologie des marqueurs (Altair)")
+    st.markdown("### Chronologie des marqueurs")
     df_temps = construire_df_temps(
         texte_source=texte_source,
         df_conn=df_conn,
@@ -357,7 +344,6 @@ def render_stats_tab(
         else:
             st.altair_chart(chart, use_container_width=True)
             st.caption(
-                "Chaque point représente une occurrence détectée, positionnée en pourcentage du texte. "
-                "La barre du bas synthétise la densité par segments."
+                "Chaque point représente une occurrence détectée, positionnée en pourcentage du texte."
             )
 
