@@ -297,6 +297,27 @@ def ajuster_negations_global(texte: str, df_marq: pd.DataFrame) -> pd.DataFrame:
 def _esc(s: str) -> str:
     return html.escape(s, quote=False)
 
+def css_checkboxes_alignment() -> str:
+    """CSS global pour harmoniser l'alignement des cases à cocher."""
+    return """<style>
+div[data-testid="stCheckbox"] {
+    display: flex;
+    align-items: center;
+    padding-top: 0.1rem;
+    padding-bottom: 0.1rem;
+}
+div[data-testid="stCheckbox"] > label {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    width: 100%;
+}
+div[data-testid="stCheckbox"] > label div[data-testid="stMarkdownContainer"] p {
+    margin-bottom: 0;
+}
+</style>"""
+
+
 def css_badges() -> str:
     lignes = [
         "<style>",
@@ -707,6 +728,7 @@ def table_spacy_df(df_spacy: pd.DataFrame) -> pd.DataFrame:
 # Interface Streamlit
 # =========================
 st.set_page_config(page_title="Discours → Code (Regex vs spaCy + JSON racine)", page_icon=None, layout="wide")
+st.markdown(css_checkboxes_alignment(), unsafe_allow_html=True)
 st.title("Discours → Code : IF / ELSE / WHILE / AND / OR + marqueurs + causes/conséquences (Regex vs spaCy)")
 
 # Chargement des dicos
