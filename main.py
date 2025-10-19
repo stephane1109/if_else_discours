@@ -794,7 +794,7 @@ with ong2:
                            file_name="occurrences_connecteurs.csv", mime="text/csv",
                            key="dl_occ_conn_csv")
 
-    st.subheader("Marqueurs détectés (après ajustements de négation autour de « pouvoir »)")
+    st.subheader("Marqueurs détectés")
     if df_marq.empty:
         st.info("Aucun marqueur détecté.")
     else:
