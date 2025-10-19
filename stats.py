@@ -146,8 +146,7 @@ def graphique_altair_chronologie(
                 scale=alt.Scale(domain=[0, 100]),
             ),
             y=alt.Y("etiquette:N", title="Famille / Catégorie"),
-            color=alt.Color("type:N", title="Type"),
-            shape=alt.Shape("type:N", legend=None),
+            color=alt.Color("type:N", title="Type", legend=alt.Legend(title="Type")),
             size=alt.Size("longueur:Q", title="Longueur repérée", legend=None),
             tooltip=[
                 alt.Tooltip("t_rel:Q", title="Progression (%)", format=".2f"),
@@ -303,40 +302,31 @@ def render_stats_tab(
         df_causes_lex=df_causes_lex,
     )
 
-    colf1, colf2 = st.columns(2)
-    with colf1:
-        choix_types = st.multiselect(
-            "Filtrer par type",
-            ["CONNECTEUR", "MARQUEUR", "CAUSE", "CONSEQUENCE"],
-            default=["CONNECTEUR", "MARQUEUR", "CAUSE", "CONSEQUENCE"],
+    if df_temps.empty:
+        options_familles: List[str] = []
+    else:
+        etiquettes = (
+            df_temps["etiquette"]
+            .dropna()
+            .astype(str)
+            .str.strip()
+            .replace("", pd.NA)
+            .dropna()
+            .unique()
         )
-    with colf2:
-        if df_temps.empty:
-            options_familles: List[str] = []
-        else:
-            etiquettes = (
-                df_temps["etiquette"]
-                .dropna()
-                .astype(str)
-                .str.strip()
-                .replace("", pd.NA)
-                .dropna()
-                .unique()
-            )
-            options_familles = sorted(str(e) for e in etiquettes)
+        options_familles = sorted(str(e) for e in etiquettes)
 
-        choix_familles = st.multiselect(
-            "Filtrer par famille/catégorie",
-            options_familles,
-            default=[],
-        )
+    choix_familles = st.multiselect(
+        "Filtrer par famille/catégorie",
+        options_familles,
+        default=[],
+    )
 
     if df_temps.empty:
         st.info("Aucune détection pour construire la chronologie.")
     else:
         chart = graphique_altair_chronologie(
             df_temps,
-            filtres_types=choix_types,
             filtres_etiquettes=choix_familles,
         )
         if chart is None:
