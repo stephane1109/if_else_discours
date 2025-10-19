@@ -102,6 +102,9 @@ def construire_df_temps(
         return pd.DataFrame()
 
     df = pd.concat(frames, ignore_index=True)
+    df["etiquette"] = (
+        df["etiquette"].astype(str).str.strip().replace("", pd.NA).fillna("INCONNU")
+    )
     cols = [
         "t_rel",
         "id_phrase",
@@ -321,9 +324,23 @@ def render_stats_tab(
             default=["CONNECTEUR", "MARQUEUR", "CAUSE", "CONSEQUENCE"],
         )
     with colf2:
+        if df_temps.empty:
+            options_familles: List[str] = []
+        else:
+            etiquettes = (
+                df_temps["etiquette"]
+                .dropna()
+                .astype(str)
+                .str.strip()
+                .replace("", pd.NA)
+                .dropna()
+                .unique()
+            )
+            options_familles = sorted(str(e) for e in etiquettes)
+
         choix_familles = st.multiselect(
             "Filtrer par famille/catégorie",
-            sorted(df_temps["etiquette"].unique().tolist()) if not df_temps.empty else [],
+            options_familles,
             default=[],
         )
 
