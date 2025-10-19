@@ -190,6 +190,73 @@ def _value_counts(df: pd.DataFrame, column: str) -> pd.DataFrame:
     return counts
 
 
+def construire_tableau_marqueurs_simples(
+    texte_source: str,
+    df_conn: pd.DataFrame,
+    df_marq: pd.DataFrame,
+    df_consq_lex: pd.DataFrame,
+    df_causes_lex: pd.DataFrame,
+) -> pd.DataFrame:
+    """Unifie connecteurs, marqueurs normatifs, causes et conséquences en un seul tableau standardisé."""
+    cadres = []
+
+    if df_conn is not None and not df_conn.empty:
+        a = df_conn.copy()
+        a["type"] = "CONNECTEUR"
+        a.rename(columns={"connecteur": "surface", "code": "etiquette"}, inplace=True)
+        cadres.append(a[["type", "etiquette", "surface"]])
+
+    if df_marq is not None and not df_marq.empty:
+        b = df_marq.copy()
+        b["type"] = "MARQUEUR"
+        b.rename(columns={"marqueur": "surface", "categorie": "etiquette"}, inplace=True)
+        cadres.append(b[["type", "etiquette", "surface"]])
+
+    if df_consq_lex is not None and not df_consq_lex.empty:
+        c = df_consq_lex.copy()
+        c["type"] = "CONSEQUENCE"
+        c.rename(columns={"consequence": "surface", "categorie": "etiquette"}, inplace=True)
+        cadres.append(c[["type", "etiquette", "surface"]])
+
+    if df_causes_lex is not None and not df_causes_lex.empty:
+        d = df_causes_lex.copy()
+        d["type"] = "CAUSE"
+        d.rename(columns={"cause": "surface", "categorie": "etiquette"}, inplace=True)
+        cadres.append(d[["type", "etiquette", "surface"]])
+
+    if not cadres:
+        return pd.DataFrame(columns=["type", "etiquette", "surface"])
+
+    df = pd.concat(cadres, ignore_index=True)
+    return df
+
+
+def graphique_frequences_barres(df_unifie: pd.DataFrame, niveau: str = "etiquette"):
+    """Affiche un histogramme de fréquences agrégées par étiquette ou type."""
+
+    if df_unifie is None or df_unifie.empty:
+        return None
+
+    champ = "etiquette" if niveau == "etiquette" else "type"
+    agg = df_unifie.groupby([champ], dropna=False).size().reset_index(name="freq")
+
+    chart = (
+        alt.Chart(agg)
+        .mark_bar()
+        .encode(
+            x=alt.X("freq:Q", title="Fréquence"),
+            y=alt.Y(f"{champ}:N", sort="-x", title="Catégorie"),
+            color=alt.Color(f"{champ}:N", legend=None),
+            tooltip=[
+                alt.Tooltip(f"{champ}:N", title="Catégorie"),
+                alt.Tooltip("freq:Q", title="Fréquence"),
+            ],
+        )
+        .properties(height=320)
+    )
+    return chart
+
+
 def render_stats_tab(
     texte_source: str,
     df_conn: pd.DataFrame,
@@ -224,14 +291,30 @@ def render_stats_tab(
 
         st.markdown("---")
 
-        st.markdown("### Répartition par catégorie")
-        counts_cat = _value_counts(df, "categorie")
-        if counts_cat.empty:
-            st.info("Impossible de calculer la répartition par catégorie.")
+        st.markdown("### Fréquences des marqueurs (histogramme)")
+        df_unifie_simple = construire_tableau_marqueurs_simples(
+            texte_source,
+            df_conn,
+            df_marqueurs,
+            df_consq_lex,
+            df_causes_lex,
+        )
+
+        if df_unifie_simple.empty:
+            st.info("Aucune donnée détectée pour calculer les fréquences.")
         else:
-            st.dataframe(counts_cat, use_container_width=True, hide_index=True)
-            chart_data = counts_cat.set_index("categorie")
-            st.bar_chart(chart_data)
+            choix_niveau = st.radio(
+                "Regrouper par",
+                ["Familles (étiquette)", "Macro-types (type)"],
+                horizontal=True,
+                index=0,
+            )
+            niveau = "etiquette" if "Familles" in choix_niveau else "type"
+            chart = graphique_frequences_barres(df_unifie_simple, niveau=niveau)
+            if chart is None:
+                st.info("Rien à afficher avec les filtres actuels.")
+            else:
+                st.altair_chart(chart, use_container_width=True)
 
         st.markdown("### Fréquence de tous les marqueurs")
         counts_marqueurs = _value_counts(df, "marqueur")
