@@ -929,12 +929,6 @@ with ong4:
         "Cadre analyse : « ou », « ou bien », « soit » posent des alternatives."
     )
 
-    st.markdown("#### Négation et verbe « pouvoir »")
-    st.write(
-        "Reclassement automatique des formes « ne … peut/peuvent/pourra/pourront (pas/plus/jamais) » en **INTERDICTION** (regex). "
-        "Cet ajustement évite de classer « ne peut » comme permission."
-    )
-
     st.markdown("#### Déclencheurs de conséquence (CONSEQUENCE)")
     st.write(
         "Repères pour l’apodose : « donc », « alors », « c’est pourquoi », "
