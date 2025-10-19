@@ -1112,4 +1112,10 @@ with ong6:
 
 # Onglet 7 : Statistiques sur les marqueurs
 with ong_stats:
-    render_stats_tab(df_marq)
+    render_stats_tab(
+        texte_source,
+        df_conn,
+        df_marq,
+        df_consq_lex,
+        df_causes_lex,
+    )
