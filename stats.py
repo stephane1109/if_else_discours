@@ -164,28 +164,41 @@ def graphique_altair_chronologie(
 
 
 def graphique_barres_marqueurs_temps(
-    df_temps_marqueurs: pd.DataFrame, maxbins: int = 20
+    df_temps_marqueurs: pd.DataFrame,
 ):
-    """Construit un histogramme temporel des marqueurs normatifs."""
+    """Construit un graphique des occurrences par marqueur dans le discours."""
 
     if df_temps_marqueurs is None or df_temps_marqueurs.empty:
         return None
 
+    colonnes_requises = {"surface", "etiquette"}
+    if not colonnes_requises.issubset(df_temps_marqueurs.columns):
+        return None
+
+    df_freq = (
+        df_temps_marqueurs
+        .assign(surface=lambda d: d["surface"].astype(str))
+        .groupby(["surface", "etiquette"], dropna=False)
+        .size()
+        .reset_index(name="occurrences")
+    )
+
+    if df_freq.empty:
+        return None
+
+    df_freq.sort_values(by=["occurrences", "surface"], ascending=[False, True], inplace=True)
+
     chart = (
-        alt.Chart(df_temps_marqueurs)
+        alt.Chart(df_freq)
         .mark_bar()
         .encode(
-            x=alt.X(
-                "t_rel:Q",
-                bin=alt.Bin(maxbins=maxbins),
-                title="Progression du discours (%)",
-            ),
-            y=alt.Y("count():Q", title="Occurrences"),
-            color=alt.Color("surface:N", title="Marqueur"),
+            x=alt.X("occurrences:Q", title="Occurrences dans le discours"),
+            y=alt.Y("surface:N", title="Marqueur", sort="-x"),
+            color=alt.Color("etiquette:N", title="Famille / Catégorie"),
             tooltip=[
                 alt.Tooltip("surface:N", title="Marqueur"),
-                alt.Tooltip("count():Q", title="Occurrences"),
-                alt.Tooltip("t_rel:Q", title="Progression (%)", bin=True),
+                alt.Tooltip("etiquette:N", title="Famille / Catégorie"),
+                alt.Tooltip("occurrences:Q", title="Occurrences"),
             ],
         )
         .properties(height=320)
@@ -233,7 +246,7 @@ def render_stats_tab(
         if total_phrases is not None:
             cols[3].metric("Phrases concernées", f"{total_phrases}")
 
-        st.markdown("### Fréquence temporelle des marqueurs")
+        st.markdown("### Fréquence des marqueurs dans le discours")
         df_temps_marqueurs = (
             df_temps[df_temps["type"] == "MARQUEUR"].copy()
             if df_temps is not None and not df_temps.empty
