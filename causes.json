@@ -19,6 +19,7 @@
   "compte tenu de": "CAUSE",
   "eu égard à": "CAUSE",
   "eu egard a": "CAUSE",
-  "du fait de": "CAUSE"
+  "du fait de": "CAUSE",
+  "parce qu'il": "CAUSE"
 }
 
