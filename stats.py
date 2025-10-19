@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import re
-from typing import Dict, List
+from typing import List
 
 import pandas as pd
 import streamlit as st
@@ -190,29 +190,6 @@ def _value_counts(df: pd.DataFrame, column: str) -> pd.DataFrame:
     return counts
 
 
-def _marqueurs_par_categorie(df: pd.DataFrame) -> Dict[str, pd.DataFrame]:
-    """Construit un dictionnaire categorie -> DataFrame des marqueurs classés par fréquence."""
-    if df.empty or "categorie" not in df.columns or "marqueur" not in df.columns:
-        return {}
-
-    tmp = df[["categorie", "marqueur"]].copy()
-    tmp["categorie"] = tmp["categorie"].astype(str).str.upper()
-    tmp["marqueur"] = tmp["marqueur"].astype(str)
-
-    grouped = (
-        tmp.groupby(["categorie", "marqueur"], dropna=False)
-        .size()
-        .rename("occurrences")
-        .reset_index()
-    )
-
-    resultat: Dict[str, pd.DataFrame] = {}
-    for categorie, bloc in grouped.groupby("categorie"):
-        tri = bloc.sort_values("occurrences", ascending=False, kind="mergesort")
-        resultat[categorie] = tri.reset_index(drop=True)
-    return resultat
-
-
 def render_stats_tab(
     texte_source: str,
     df_conn: pd.DataFrame,
@@ -277,16 +254,6 @@ def render_stats_tab(
                 .properties(height=hauteur)
             )
             st.altair_chart(chart_marqueurs, use_container_width=True)
-
-        st.markdown("### Marqueurs les plus fréquents par catégorie")
-        repartition = _marqueurs_par_categorie(df)
-        if not repartition:
-            st.info("Aucune donnée exploitable pour afficher les marqueurs par catégorie.")
-        else:
-            for categorie in sorted(repartition.keys()):
-                st.markdown(f"**{categorie.replace('_', ' ')}**")
-                top = repartition[categorie].head(10)
-                st.dataframe(top, use_container_width=True, hide_index=True)
 
         st.markdown("---")
 
