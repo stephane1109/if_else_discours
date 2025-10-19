@@ -161,35 +161,6 @@ def graphique_altair_chronologie(
     )
 
     return base
-
-
-def _value_counts(df: pd.DataFrame, column: str) -> pd.DataFrame:
-    """Retourne les occurrences d'une colonne en normalisant les valeurs texte."""
-    if column not in df.columns:
-        return pd.DataFrame(columns=[column, "occurrences"])
-
-    series = (
-        df[column]
-        .dropna()
-        .astype(str)
-        .str.strip()
-        .replace("", pd.NA)
-        .dropna()
-    )
-    if series.empty:
-        return pd.DataFrame(columns=[column, "occurrences"])
-
-    counts = (
-        series.str.upper()
-        .value_counts()
-        .rename_axis(column)
-        .reset_index(name="occurrences")
-        .sort_values("occurrences", ascending=False, kind="mergesort")
-        .reset_index(drop=True)
-    )
-    return counts
-
-
 def construire_tableau_marqueurs_simples(
     texte_source: str,
     df_conn: pd.DataFrame,
@@ -257,6 +228,36 @@ def graphique_frequences_barres(df_unifie: pd.DataFrame, niveau: str = "etiquett
     return chart
 
 
+def graphique_barres_marqueurs_temps(
+    df_temps_marqueurs: pd.DataFrame, maxbins: int = 20
+):
+    """Construit un histogramme temporel des marqueurs normatifs."""
+
+    if df_temps_marqueurs is None or df_temps_marqueurs.empty:
+        return None
+
+    chart = (
+        alt.Chart(df_temps_marqueurs)
+        .mark_bar()
+        .encode(
+            x=alt.X(
+                "t_rel:Q",
+                bin=alt.Bin(maxbins=maxbins),
+                title="Progression du discours (%)",
+            ),
+            y=alt.Y("count():Q", title="Occurrences"),
+            color=alt.Color("surface:N", title="Marqueur"),
+            tooltip=[
+                alt.Tooltip("surface:N", title="Marqueur"),
+                alt.Tooltip("count():Q", title="Occurrences"),
+                alt.Tooltip("t_rel:Q", title="Progression (%)", bin=True),
+            ],
+        )
+        .properties(height=320)
+    )
+    return chart
+
+
 def render_stats_tab(
     texte_source: str,
     df_conn: pd.DataFrame,
@@ -266,6 +267,14 @@ def render_stats_tab(
 ) -> None:
     """Affiche les statistiques des marqueurs dans l'onglet Streamlit dédié."""
     st.subheader("Statistiques des marqueurs normatifs")
+
+    df_temps = construire_df_temps(
+        texte_source=texte_source,
+        df_conn=df_conn,
+        df_marq=df_marqueurs,
+        df_consq_lex=df_consq_lex,
+        df_causes_lex=df_causes_lex,
+    )
 
     if df_marqueurs is None or df_marqueurs.empty:
         st.info("Aucun marqueur détecté pour générer des statistiques.")
@@ -316,27 +325,20 @@ def render_stats_tab(
             else:
                 st.altair_chart(chart, use_container_width=True)
 
-        st.markdown("### Fréquence de tous les marqueurs")
-        counts_marqueurs = _value_counts(df, "marqueur")
-        if counts_marqueurs.empty:
-            st.info("Impossible de calculer la fréquence des marqueurs.")
+        st.markdown("### Fréquence temporelle des marqueurs")
+        df_temps_marqueurs = (
+            df_temps[df_temps["type"] == "MARQUEUR"].copy()
+            if df_temps is not None and not df_temps.empty
+            else pd.DataFrame()
+        )
+        if df_temps_marqueurs.empty:
+            st.info("Impossible de construire la distribution temporelle des marqueurs.")
         else:
-            st.dataframe(counts_marqueurs, use_container_width=True, hide_index=True)
-            hauteur = max(200, 22 * len(counts_marqueurs))
-            chart_marqueurs = (
-                alt.Chart(counts_marqueurs)
-                .mark_bar()
-                .encode(
-                    y=alt.Y("marqueur:N", sort="-x", title="Marqueur"),
-                    x=alt.X("occurrences:Q", title="Occurrences"),
-                    tooltip=[
-                        alt.Tooltip("marqueur:N", title="Marqueur"),
-                        alt.Tooltip("occurrences:Q", title="Occurrences"),
-                    ],
-                )
-                .properties(height=hauteur)
-            )
-            st.altair_chart(chart_marqueurs, use_container_width=True)
+            chart_marqueurs_temps = graphique_barres_marqueurs_temps(df_temps_marqueurs)
+            if chart_marqueurs_temps is None:
+                st.info("Rien à afficher avec les données disponibles.")
+            else:
+                st.altair_chart(chart_marqueurs_temps, use_container_width=True)
 
         st.markdown("---")
 
@@ -344,14 +346,6 @@ def render_stats_tab(
         st.markdown("---")
 
     st.markdown("### Chronologie des marqueurs")
-    df_temps = construire_df_temps(
-        texte_source=texte_source,
-        df_conn=df_conn,
-        df_marq=df_marqueurs,
-        df_consq_lex=df_consq_lex,
-        df_causes_lex=df_causes_lex,
-    )
-
     if df_temps.empty:
         options_familles: List[str] = []
     else:
