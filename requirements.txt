@@ -16,5 +16,7 @@ click==8.1.7
 # Backend transformer PyTorch
 torch==2.2.2       # CPU, plus léger/fiable sur Streamlit Cloud
 # Modèle français transformeur compatible spaCy 3.7.x
-# Si la 3.7.2 404, essaie 3.7.1 ou 3.7.0 (même motif d'URL).
-fr_core_news_trf @ https://github.com/explosion/spacy-models/releases/download/fr_core_news_trf-3.7.2/fr_core_news_trf-3.7.2-py3-none-any.whl
+# Essaye d'abord le modèle TRF "dep" (souvent plus disponible)
+fr_dep_news_trf @ https://github.com/explosion/spacy-models/releases/download/fr_dep_news_trf-3.7.2/fr_dep_news_trf-3.7.2-py3-none-any.whl
+# Si tu tiens au "core" TRF, dé-commente CETTE ligne et commente celle de fr_dep_news_trf ci-dessus.
+# fr_core_news_trf @ https://github.com/explosion/spacy-models/releases/download/fr_core_news_trf-3.7.2/fr_core_news_trf-3.7.2-py3-none-any.whl
