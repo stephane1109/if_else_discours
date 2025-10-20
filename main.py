@@ -1099,6 +1099,7 @@ with ong2:
     else:
         show_memoires_categories = None
 
+    st.markdown("**Marqueurs de causalité**")
     show_consequences = st.checkbox("CONSEQUENCE", value=True, key="chk_consequence")
     show_causes = st.checkbox("CAUSE", value=True, key="chk_cause")
 
