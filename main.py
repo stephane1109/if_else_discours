@@ -8,6 +8,7 @@
 #   - dict_marqueurs.json    : marqueurs normatifs (OBLIGATION/INTERDICTION/…)
 #   - consequences.json      : déclencheurs de conséquence → "CONSEQUENCE"
 #   - causes.json            : déclencheurs de cause → "CAUSE"
+#   - souvenirs.json         : déclencheurs liés à la mémoire → « MEM_* »
 #
 # Remarques :
 #   - L’extraction CAUSE→CONSEQUENCE spaCy exploite la dépendance/les ancres causales et consécutives.
@@ -126,6 +127,12 @@ COULEURS_MARQUEURS: Dict[str, Dict[str, str]] = {
     "CADRE_FERMETURE": {"bg": "#ede7f6", "fg": "#6a1b9a", "bd": "#6a1b9a"},
     "CONSEQUENCE": {"bg": "#fff0f0", "fg": "#b00020", "bd": "#b00020"},
     "CAUSE": {"bg": "#f0fff4", "fg": "#2f855a", "bd": "#2f855a"},
+    "MEM_PERS": {"bg": "#e8f4ff", "fg": "#1565c0", "bd": "#1565c0"},
+    "MEM_COLL": {"bg": "#f1f8e9", "fg": "#33691e", "bd": "#33691e"},
+    "MEM_RAPPEL": {"bg": "#fff3e0", "fg": "#ef6c00", "bd": "#ef6c00"},
+    "MEM_RENVOI": {"bg": "#f3e5f5", "fg": "#7b1fa2", "bd": "#7b1fa2"},
+    "MEM_REPET": {"bg": "#ede7f6", "fg": "#5e35b1", "bd": "#5e35b1"},
+    "MEM_PASSE": {"bg": "#efebe9", "fg": "#6d4c41", "bd": "#6d4c41"},
 }
 FAMILLES_MARQUEURS_STANDARD = {
     "OBLIGATION", "INTERDICTION", "PERMISSION", "RECOMMANDATION", "SANCTION", "CADRE_OUVERTURE", "CADRE_FERMETURE"
@@ -262,6 +269,7 @@ def charger_dicos_conditions() -> Tuple[
     Dict[str, str],
     Dict[str, str],
     Dict[str, str],
+    Dict[str, str],
 ]:
     """Charge les dictionnaires nécessaires au modèle SI / ALORS / SINON."""
     cwd = os.getcwd()
@@ -270,7 +278,8 @@ def charger_dicos_conditions() -> Tuple[
     d_marq = charger_json_dico(os.path.join(cwd, "dict_marqueurs.json"))
     d_cons = charger_json_dico(os.path.join(cwd, "consequences.json"))
     d_caus = charger_json_dico(os.path.join(cwd, "causes.json"))
-    return d_cond, d_alt, d_marq, d_cons, d_caus
+    d_mem = charger_json_dico(os.path.join(cwd, "souvenirs.json"))
+    return d_cond, d_alt, d_marq, d_cons, d_caus, d_mem
 
 # =========================
 # I/O discours
@@ -321,6 +330,9 @@ def detecter_connecteurs(texte: str, dico_conn: Dict[str, str]) -> pd.DataFrame:
 
 def detecter_marqueurs(texte: str, dico_marq: Dict[str, str]) -> pd.DataFrame:
     return detecter_par_dico(texte, dico_marq, "marqueur", "categorie")
+
+def detecter_memoires(texte: str, dico_mem: Dict[str, str]) -> pd.DataFrame:
+    return detecter_par_dico(texte, dico_mem, "memoire", "categorie")
 
 def detecter_consequences_lex(texte: str, dico_consq: Dict[str, str]) -> pd.DataFrame:
     # On ajoute une colonne 'consequence' pour homogénéiser les affichages regex
@@ -439,6 +451,7 @@ def css_badges() -> str:
 def occurrences_mixte(texte: str,
                       dico_conn: Dict[str, str],
                       dico_marq: Dict[str, str],
+                      dico_memoires: Dict[str, str],
                       dico_consq: Dict[str, str],
                       dico_causes: Dict[str, str]) -> List[Dict[str, Any]]:
     """Fusionne toutes les occurrences, élimine les chevauchements (priorité au plus long)."""
@@ -446,6 +459,7 @@ def occurrences_mixte(texte: str,
     for typ, dico in [
         ("connecteur", dico_conn),
         ("marqueur", dico_marq),
+        ("memoire", dico_memoires),
         ("consequence", dico_consq),
         ("cause", dico_causes),
     ]:
@@ -471,12 +485,14 @@ def libelle_python(code: str) -> str:
 def html_annote(texte: str,
                 dico_conn: Dict[str, str],
                 dico_marq: Dict[str, str],
+                dico_memoires: Dict[str, str],
                 dico_consq: Dict[str, str],
                 dico_causes: Dict[str, str],
                 show_codes: Dict[str, bool],
                 show_consequences: bool,
                 show_causes: bool,
-                show_marqueurs_categories: Dict[str, bool] = None) -> str:
+                show_marqueurs_categories: Dict[str, bool] = None,
+                show_memoires_categories: Dict[str, bool] = None) -> str:
     """Produit le HTML annoté selon les cases cochées."""
     if not texte:
         return "<div class='texte-annote'>(Texte vide)</div>"
@@ -485,9 +501,14 @@ def html_annote(texte: str,
             str(cat).upper(): bool(val)
             for cat, val in show_marqueurs_categories.items()
         }
+    if show_memoires_categories is not None:
+        show_memoires_categories = {
+            str(cat).upper(): bool(val)
+            for cat, val in show_memoires_categories.items()
+        }
 
     t = texte
-    occ = occurrences_mixte(t, dico_conn, dico_marq, dico_consq, dico_causes)
+    occ = occurrences_mixte(t, dico_conn, dico_marq, dico_memoires, dico_consq, dico_causes)
     morceaux: List[str] = []; curseur = 0
     for m in occ:
         # Filtres d’affichage
@@ -498,6 +519,10 @@ def html_annote(texte: str,
         elif m["type"] == "marqueur":
             cat = str(m["etiquette"]).upper()
             if show_marqueurs_categories is not None and not show_marqueurs_categories.get(cat, True):
+                continue
+        elif m["type"] == "memoire":
+            cat = str(m["etiquette"]).upper()
+            if show_memoires_categories is not None and not show_memoires_categories.get(cat, True):
                 continue
         elif m["type"] == "consequence":
             if not show_consequences:
@@ -886,6 +911,7 @@ try:
         DICO_MARQUEURS,
         DICO_CONSQS,
         DICO_CAUSES,
+        DICO_MEMOIRES,
     ) = charger_dicos_conditions()
 except Exception as e:
     st.error("Impossible de charger les dictionnaires JSON à la racine.")
@@ -938,11 +964,13 @@ if texte_source.strip():
     df_conn = detecter_connecteurs(texte_source, DICO_CONNECTEURS)
     df_marq_brut = detecter_marqueurs(texte_source, DICO_MARQUEURS)
     df_marq = ajuster_negations_global(texte_source, df_marq_brut)
+    df_memoires = detecter_memoires(texte_source, DICO_MEMOIRES)
     df_consq_lex = detecter_consequences_lex(texte_source, DICO_CONSQS) if use_regex_cc else pd.DataFrame()
     df_causes_lex = detecter_causes_lex(texte_source, DICO_CAUSES) if use_regex_cc else pd.DataFrame()
 else:
     df_conn = pd.DataFrame()
     df_marq = pd.DataFrame()
+    df_memoires = pd.DataFrame()
     df_consq_lex = pd.DataFrame()
     df_causes_lex = pd.DataFrame()
 
@@ -992,6 +1020,16 @@ with ong2:
                            data=df_marq.to_csv(index=False).encode("utf-8"),
                            file_name="occurrences_marqueurs.csv", mime="text/csv",
                            key="dl_occ_marq_csv")
+
+    st.subheader("Marqueurs mémoire détectés")
+    if df_memoires.empty:
+        st.info("Aucun marqueur mémoire détecté.")
+    else:
+        st.dataframe(df_memoires, use_container_width=True, hide_index=True)
+        st.download_button("Exporter marqueurs mémoire (CSV)",
+                           data=df_memoires.to_csv(index=False).encode("utf-8"),
+                           file_name="occurrences_memoires.csv", mime="text/csv",
+                           key="dl_occ_memoires_csv")
 
     colX, colY = st.columns(2)
     with colX:
@@ -1047,6 +1085,20 @@ with ong2:
     else:
         show_marqueurs_categories = None
 
+    categories_memoires = sorted({str(v).upper() for v in DICO_MEMOIRES.values()})
+    show_memoires_categories: Dict[str, bool] = {}
+    if categories_memoires:
+        st.markdown("**Marqueurs mémoire**")
+        for cat in categories_memoires:
+            label = cat.replace("_", " ")
+            show_memoires_categories[cat] = st.checkbox(
+                label,
+                value=True,
+                key=f"chk_memoire_{cat.lower()}"
+            )
+    else:
+        show_memoires_categories = None
+
     show_consequences = st.checkbox("CONSEQUENCE", value=True, key="chk_consequence")
     show_causes = st.checkbox("CAUSE", value=True, key="chk_cause")
 
@@ -1059,10 +1111,12 @@ with ong2:
             texte_source,
             DICO_CONNECTEURS,
             DICO_MARQUEURS,
+            DICO_MEMOIRES,
             DICO_CONSQS if show_consequences else {},
             DICO_CAUSES if show_causes else {},
             show_codes=show_codes,
             show_marqueurs_categories=show_marqueurs_categories,
+            show_memoires_categories=show_memoires_categories,
             show_consequences=show_consequences,
             show_causes=show_causes
         )
@@ -1085,6 +1139,8 @@ with ong3:
     st.json(DICO_CONSQS, expanded=False)
     st.markdown("**causes.json**")
     st.json(DICO_CAUSES, expanded=False)
+    st.markdown("**souvenirs.json**")
+    st.json(DICO_MEMOIRES, expanded=False)
 
 # Onglet 4 : Guide d’interprétation
 with ong4:
@@ -1280,6 +1336,7 @@ with ong_stats:
         texte_source,
         df_conn,
         df_marq,
+        df_memoires,
         df_consq_lex,
         df_causes_lex,
     )

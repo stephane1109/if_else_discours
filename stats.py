@@ -64,6 +64,7 @@ def construire_df_temps(
     texte_source: str,
     df_conn: pd.DataFrame,
     df_marq: pd.DataFrame,
+    df_memoires: pd.DataFrame,
     df_consq_lex: pd.DataFrame,
     df_causes_lex: pd.DataFrame,
 ) -> pd.DataFrame:
@@ -85,6 +86,12 @@ def construire_df_temps(
         b.rename(columns={"marqueur": "surface", "categorie": "etiquette"}, inplace=True)
         b = _ajoute_colonne_t_rel(b, phrases, offsets, total_len)
 
+    m = df_memoires.copy()
+    if not m.empty:
+        m["type"] = "MEMOIRE"
+        m.rename(columns={"memoire": "surface", "categorie": "etiquette"}, inplace=True)
+        m = _ajoute_colonne_t_rel(m, phrases, offsets, total_len)
+
     c = df_consq_lex.copy()
     if not c.empty:
         c["type"] = "CONSEQUENCE"
@@ -97,7 +104,7 @@ def construire_df_temps(
         d.rename(columns={"cause": "surface", "categorie": "etiquette"}, inplace=True)
         d = _ajoute_colonne_t_rel(d, phrases, offsets, total_len)
 
-    frames = [x for x in [a, b, c, d] if x is not None and not x.empty]
+    frames = [x for x in [a, b, m, c, d] if x is not None and not x.empty]
     if not frames:
         return pd.DataFrame()
 
@@ -208,45 +215,69 @@ def render_stats_tab(
     texte_source: str,
     df_conn: pd.DataFrame,
     df_marqueurs: pd.DataFrame,
+    df_memoires: pd.DataFrame,
     df_consq_lex: pd.DataFrame,
     df_causes_lex: pd.DataFrame,
 ) -> None:
     """Affiche les statistiques des marqueurs dans l'onglet Streamlit dédié."""
-    st.subheader("Statistiques des marqueurs normatifs")
+    st.subheader("Statistiques des marqueurs normatifs & mémoire")
 
     df_temps = construire_df_temps(
         texte_source=texte_source,
         df_conn=df_conn,
         df_marq=df_marqueurs,
+        df_memoires=df_memoires,
         df_consq_lex=df_consq_lex,
         df_causes_lex=df_causes_lex,
     )
 
-    if df_marqueurs is None or df_marqueurs.empty:
+    df_normatif = pd.DataFrame()
+    if df_marqueurs is not None and not df_marqueurs.empty:
+        df_normatif = df_marqueurs.copy()
+        df_normatif["categorie"] = df_normatif["categorie"].astype(str).str.upper()
+        df_normatif["surface"] = df_normatif["marqueur"].astype(str)
+        df_normatif["type_source"] = "NORMATIF"
+
+    df_memoire = pd.DataFrame()
+    if df_memoires is not None and not df_memoires.empty:
+        df_memoire = df_memoires.copy()
+        df_memoire["categorie"] = df_memoire["categorie"].astype(str).str.upper()
+        df_memoire["surface"] = df_memoire["memoire"].astype(str)
+        df_memoire["type_source"] = "MEMOIRE"
+
+    frames = [x for x in [df_normatif, df_memoire] if not x.empty]
+
+    if not frames:
         st.info("Aucun marqueur détecté pour générer des statistiques.")
         df = pd.DataFrame()
     else:
-        df = df_marqueurs.copy()
-        df["categorie"] = df["categorie"].astype(str).str.upper()
-        df["marqueur"] = df["marqueur"].astype(str)
+        df = pd.concat(frames, ignore_index=True)
 
         total_occurrences = len(df)
         total_categories = df["categorie"].nunique(dropna=True)
-        total_marqueurs_distincts = df["marqueur"].nunique(dropna=True)
+        total_surfaces_distinctes = df["surface"].nunique(dropna=True)
         total_phrases = (
             df["id_phrase"].nunique(dropna=True) if "id_phrase" in df.columns else None
         )
 
         cols = st.columns(4 if total_phrases is not None else 3)
-        cols[0].metric("Occurrences", f"{total_occurrences}")
+        cols[0].metric("Occurrences (total)", f"{total_occurrences}")
         cols[1].metric("Catégories distinctes", f"{total_categories}")
-        cols[2].metric("Marqueurs distincts", f"{total_marqueurs_distincts}")
+        cols[2].metric("Expressions distinctes", f"{total_surfaces_distinctes}")
         if total_phrases is not None:
             cols[3].metric("Phrases concernées", f"{total_phrases}")
 
+        repartition_parts = []
+        if not df_normatif.empty:
+            repartition_parts.append(f"normatifs : {len(df_normatif)}")
+        if not df_memoire.empty:
+            repartition_parts.append(f"mémoire : {len(df_memoire)}")
+        if repartition_parts:
+            st.caption("Répartition — " + " ; ".join(repartition_parts))
+
         st.markdown("### Fréquence des marqueurs dans le discours")
         df_temps_marqueurs = (
-            df_temps[df_temps["type"] == "MARQUEUR"].copy()
+            df_temps[df_temps["type"].isin(["MARQUEUR", "MEMOIRE"])].copy()
             if df_temps is not None and not df_temps.empty
             else pd.DataFrame()
         )
