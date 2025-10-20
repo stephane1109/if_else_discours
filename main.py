@@ -90,38 +90,38 @@ except Exception as err:
 # Palettes / libellés Python (affichage)
 # =========================
 CODE_VERS_PYTHON: Dict[str, str] = {
-    "CONDITION": "if",
-    "ALORS": "then",
-    "ALTERNATIVE": "else",
+    "CONDITION": "CONDITION (SI)",
+    "ALORS": "ALORS",
+    "ALTERNATIVE": "ALTERNATIVE (Sinon)",
     "WHILE": "while",
     # Compatibilité ascendante
-    "IF": "if",
-    "ELSE": "else",
+    "IF": "CONDITION (SI)",
+    "ELSE": "ALTERNATIVE (Sinon)",
     "AND": "and",
     "OR": "or",
 }
 
 COULEURS_BADGES: Dict[str, Dict[str, str]] = {
-    "CONDITION": {"bg": "#e6f0ff", "fg": "#0b5ed7", "bd": "#0b5ed7"},
-    "ALORS": {"bg": "#fff3e6", "fg": "#b54b00", "bd": "#b54b00"},
-    "ALTERNATIVE": {"bg": "#f3e8ff", "fg": "#6f42c1", "bd": "#6f42c1"},
+    "CONDITION": {"bg": "#ffeaea", "fg": "#c00000", "bd": "#c00000"},
+    "ALORS": {"bg": "#ffeaea", "fg": "#c00000", "bd": "#c00000"},
+    "ALTERNATIVE": {"bg": "#ffeaea", "fg": "#c00000", "bd": "#c00000"},
     "WHILE": {"bg": "#e9fbe6", "fg": "#2f7d32", "bd": "#2f7d32"},
     # Compatibilité ascendante
-    "IF": {"bg": "#e6f0ff", "fg": "#0b5ed7", "bd": "#0b5ed7"},
-    "ELSE": {"bg": "#f3e8ff", "fg": "#6f42c1", "bd": "#6f42c1"},
+    "IF": {"bg": "#ffeaea", "fg": "#c00000", "bd": "#c00000"},
+    "ELSE": {"bg": "#ffeaea", "fg": "#c00000", "bd": "#c00000"},
     "AND": {"bg": "#e6fffb", "fg": "#0d9488", "bd": "#0d9488"},
     "OR": {"bg": "#fff3e6", "fg": "#b54b00", "bd": "#b54b00"},
 }
 
 LIBELLES_CODES: Dict[str, str] = {
-    "CONDITION": "CONDITION (si)",
-    "ALORS": "ALORS (apodose)",
-    "ALTERNATIVE": "ALTERNATIVE (sinon)",
+    "CONDITION": "CONDITION (SI)",
+    "ALORS": "ALORS",
+    "ALTERNATIVE": "ALTERNATIVE (Sinon)",
     "WHILE": "WHILE (tant que)",
     "AND": "AND (et)",
     "OR": "OR (ou)",
-    "IF": "IF (si)",
-    "ELSE": "ELSE (sinon)",
+    "IF": "CONDITION (SI)",
+    "ELSE": "ALTERNATIVE (Sinon)",
 }
 
 COULEURS_MARQUEURS: Dict[str, Dict[str, str]] = {
@@ -434,7 +434,7 @@ def css_badges() -> str:
         ".texte-annote { line-height: 1.8; font-size: 1.05rem; white-space: pre-wrap; }",
         ".badge-code { display: inline-block; padding: 0.05rem 0.4rem; margin-left: 0.25rem; border: 1px solid #333; border-radius: 0.35rem; font-family: monospace; font-size: 0.85em; vertical-align: baseline; }",
         ".badge-marqueur { display: inline-block; padding: 0.03rem 0.35rem; margin-left: 0.2rem; border: 1px dashed #333; border-radius: 0.35rem; font-family: monospace; font-size: 0.78em; vertical-align: baseline; }",
-        ".connecteur { font-weight: 600; }",
+        ".connecteur { font-weight: 600; color: #c00000; }",
         ".mot-marque { font-weight: 600; text-decoration: underline; }",
         "</style>",
     ]
