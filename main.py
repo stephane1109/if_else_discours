@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # main.py — Discours → Code (SI / ALORS / SINON / TANT QUE) + Marqueurs + Causes/Conséquences
-# Méthodes comparées : Regex vs spaCy (transformer si disponible)
+# Méthodes comparées : Regex vs spaCy (modèle moyen si disponible)
 #
 # Fichiers requis à la racine (même dossier que ce script) :
 #   - conditions.json        : mapping des segments conditionnels → CONDITION / ALORS / WHILE
@@ -41,7 +41,7 @@ def rendre_jpeg_depuis_dot(dot_str: str) -> bytes:
     return src.pipe(format="jpg")
 
 # =========================
-# Chargement spaCy (transformer si possible)
+# Chargement spaCy (modèles FR standards)
 # =========================
 SPACY_OK = False
 NLP = None
@@ -72,7 +72,7 @@ try:
             )
         return None
 
-    for name in ("fr_dep_news_trf", "fr_core_news_trf", "fr_core_news_md"):
+    for name in ("fr_core_news_md", "fr_core_news_sm", "fr_dep_news_trf", "fr_core_news_trf"):
         modele = _charger_modele_spacy(name)
         if modele is not None:
             NLP = modele
@@ -910,7 +910,7 @@ ALT_TERMS = set(DICO_ALTERNATIVES.keys())
 # Alerte spaCy/Graphviz
 if not SPACY_OK:
     st.warning(
-        "spaCy FR indisponible (transformer préféré, fallback md si disponible). L’onglet spaCy utilisera uniquement Regex si aucun modèle FR n’est chargé."
+        "spaCy FR indisponible (installez par exemple le modèle 'fr_core_news_md'). L’onglet spaCy utilisera uniquement Regex si aucun modèle FR n’est chargé."
     )
 if SPACY_STATUS:
     st.caption(" ; ".join(SPACY_STATUS))
@@ -1278,7 +1278,7 @@ with ong6:
                     key="dl_cc_spacy_csv"
                 )
         elif use_spacy_cc and not SPACY_OK:
-            st.warning("spaCy FR indisponible (installez un modèle français, idéalement transformer).")
+            st.warning("spaCy FR indisponible (installez un modèle français, par exemple 'fr_core_news_md').")
         else:
             st.info("spaCy désactivé (voir la barre latérale).")
 
