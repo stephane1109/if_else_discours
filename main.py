@@ -72,7 +72,7 @@ try:
             )
         return None
 
-    for name in ("fr_core_news_md", "fr_core_news_sm", "fr_dep_news_trf", "fr_core_news_trf"):
+    for name in ("fr_core_news_md", "fr_core_news_sm"):
         modele = _charger_modele_spacy(name)
         if modele is not None:
             NLP = modele
