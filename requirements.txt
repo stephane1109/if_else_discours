@@ -1,5 +1,7 @@
-# Les dépendances Python requises (Streamlit, pandas, graphviz, Pillow, altair, spaCy, etc.)
-# sont déjà préinstallées dans l'environnement de déploiement utilisé par l'application.
-# Le fichier est volontairement vide afin d'éviter les installations pip inutiles qui
-# échouent hors-ligne. Si vous exécutez ce projet localement, installez les dépendances
-# nécessaires selon votre environnement (ex. : `pip install streamlit pandas graphviz pillow altair spacy`).
+streamlit>=1.36
+pandas>=2.0
+graphviz>=0.20
+spacy==3.8.7
+altair>=5.0
+# Après l'installation des dépendances, exécutez également :
+# python -m spacy download fr_core_news_md
