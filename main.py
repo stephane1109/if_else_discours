@@ -19,7 +19,7 @@ import json
 import html
 import pandas as pd
 import streamlit as st
-from typing import List, Dict, Tuple, Any
+from typing import List, Dict, Tuple, Any, Optional
 
 from stats import render_stats_tab
 
@@ -145,6 +145,126 @@ def construire_regex_depuis_liste(expressions: List[str]) -> List[Tuple[str, re.
         motifs.append((e, motif))
     return motifs
 
+def _est_debut_segment(texte: str, index: int) -> bool:
+    """Vérifie qu’un index correspond au début d’un segment (début ou précédé d’une ponctuation forte)."""
+    if index <= 0:
+        return True
+    j = index - 1
+    while j >= 0 and texte[j].isspace():
+        j -= 1
+    if j < 0:
+        return True
+    return texte[j] in ".,;:!?-—(«»\"'“”"
+
+def _trouver_occurrences_motifs(texte: str, motifs: List[Tuple[str, re.Pattern]]) -> List[Dict[str, Any]]:
+    """Retourne les occurrences non chevauchantes pour une liste de motifs (triée par position)."""
+    if not texte or not motifs:
+        return []
+    occurrences: List[Dict[str, Any]] = []
+    spans: List[Tuple[int, int]] = []
+    for expr, pattern in motifs:
+        for m in pattern.finditer(texte):
+            span = (m.start(), m.end())
+            if any(not (span[1] <= s[0] or span[0] >= s[1]) for s in spans):
+                continue
+            occurrences.append({
+                "start": m.start(),
+                "end": m.end(),
+                "expression": expr,
+                "match": texte[m.start():m.end()],
+            })
+            spans.append(span)
+    occurrences.sort(key=lambda occ: occ["start"])
+    return occurrences
+
+def _premier_match_motifs(
+    texte: str,
+    motifs: List[Tuple[str, re.Pattern]],
+    start: int = 0,
+    require_boundary: bool = False,
+    skip_short: bool = False,
+) -> Optional[re.Match]:
+    """Renvoie le premier match satisfaisant les contraintes (ou None)."""
+    if not texte or not motifs:
+        return None
+    meilleur: Optional[re.Match] = None
+    for expr, pattern in motifs:
+        expr_clean = expr.replace(" ", "")
+        if skip_short and len(expr_clean) <= 2:
+            continue
+        m = pattern.search(texte, pos=start)
+        if not m:
+            continue
+        if require_boundary and not _est_debut_segment(texte, m.start()):
+            continue
+        if meilleur is None or m.start() < meilleur.start():
+            meilleur = m
+    return meilleur
+
+def _fin_clause_condition(phrase: str, start_pos: int) -> int:
+    """Retourne l’index de la ponctuation suivant la condition (ou la fin de la phrase)."""
+    if start_pos >= len(phrase):
+        return len(phrase)
+    sub = phrase[start_pos:]
+    m = re.search(r"[,;:\-\—]\s+", sub)
+    if m:
+        return start_pos + m.start()
+    return len(phrase)
+
+def _extraire_condition_contenu(phrase: str, match_end: int, next_start: Optional[int]) -> str:
+    """Extrait le contenu conditionnel après le déclencheur jusqu’à la ponctuation ou au prochain déclencheur."""
+    segment = phrase[match_end:]
+    if not segment:
+        return ""
+    limite = len(segment)
+    m = re.search(r"[,;:\-\—]\s+", segment)
+    if m:
+        limite = min(limite, m.start())
+    if next_start is not None:
+        limite = min(limite, max(0, next_start - match_end))
+    return segment[:limite].strip(" .;:-—")
+
+def _segment_apres_condition(
+    phrase: str,
+    clause_end: int,
+    motifs_apodose: List[Tuple[str, re.Pattern]],
+    motifs_alt: List[Tuple[str, re.Pattern]],
+) -> str:
+    """Retourne l’apodose commune après la dernière condition, en rognant l’éventuelle alternative."""
+    suite = phrase[clause_end:] if clause_end < len(phrase) else ""
+    suite = suite.lstrip(" ,;:-—")
+    if not suite:
+        return ""
+    if motifs_apodose:
+        match_apod = _premier_match_motifs(phrase, motifs_apodose, start=clause_end)
+        if match_apod:
+            suite = phrase[match_apod.end():].lstrip(" ,;:-—")
+    if not suite:
+        return ""
+    if motifs_alt:
+        alt_match = _premier_match_motifs(suite, motifs_alt, start=0, require_boundary=True, skip_short=True)
+        if alt_match:
+            suite = suite[:alt_match.start()]
+    return suite.strip(" .;:-—")
+
+def _texte_apres_alternative(
+    phrase: str,
+    clause_end: int,
+    motifs_alt: List[Tuple[str, re.Pattern]],
+) -> str:
+    """Extrait la branche alternative (else) si un déclencheur est présent après la condition."""
+    if not motifs_alt:
+        return ""
+    match_alt = _premier_match_motifs(phrase, motifs_alt, start=clause_end, require_boundary=True, skip_short=True)
+    if not match_alt:
+        return ""
+    return phrase[match_alt.end():].strip(" .;:-—")
+
+def _expressions_par_etiquette(dico: Dict[str, str], etiquette: str) -> List[str]:
+    """Filtre les expressions d’un dictionnaire selon leur étiquette normalisée."""
+    cible = etiquette.upper()
+    return [k for k, v in dico.items() if str(v).upper() == cible]
+
 # =========================
 # Chargement JSON à la racine
 # =========================
@@ -158,19 +278,28 @@ def charger_json_dico(chemin: str) -> Dict[str, str]:
         raise ValueError(f"Format JSON non supporté (attendu dict) : {chemin}")
     return {normaliser_espace(k.lower()): str(v).upper() for k, v in data.items() if k and str(k).strip()}
 
-def charger_tous_les_dicos() -> Tuple[Dict[str, str], Dict[str, str], Dict[str, str], Dict[str, str]]:
-    """Charge dic_code.json, dict_marqueurs.json, consequences.json, causes.json à la racine du projet."""
+def charger_tous_les_dicos() -> Tuple[
+    Dict[str, str],
+    Dict[str, str],
+    Dict[str, str],
+    Dict[str, str],
+    Dict[str, str],
+    Dict[str, str],
+]:
+    """Charge tous les dictionnaires JSON requis à la racine du projet."""
     cwd = os.getcwd()
     d_code = charger_json_dico(os.path.join(cwd, "dic_code.json"))
     d_marq = charger_json_dico(os.path.join(cwd, "dict_marqueurs.json"))
     d_cons = charger_json_dico(os.path.join(cwd, "consequences.json"))
     d_caus = charger_json_dico(os.path.join(cwd, "causes.json"))
+    d_cond = charger_json_dico(os.path.join(cwd, "conditions.json"))
+    d_alt = charger_json_dico(os.path.join(cwd, "alternatives.json"))
 
     codes_utilises = set(d_code.values())
     attendus = FAMILLES_CONNECTEURS
     if not codes_utilises.issubset(attendus):
         raise ValueError(f"dic_code.json contient des familles inconnues : {sorted(list(codes_utilises - attendus))}")
-    return d_code, d_marq, d_cons, d_caus
+    return d_code, d_marq, d_cons, d_caus, d_cond, d_alt
 
 # =========================
 # I/O discours
@@ -455,61 +584,35 @@ def extraire_segments_while(texte: str) -> List[Dict[str, Any]]:
             })
     return res
 
-def _proposition_principale_apres_dernier_si(phrase: str, last_si_end: int, df_consq_phrase: pd.DataFrame) -> str:
-    """Si un déclencheur de conséquence apparaît après la dernière condition, prendre ce qui suit ; sinon couper à la 1re ponctuation."""
-    reste = phrase[last_si_end:].strip()
-    if df_consq_phrase is not None and not df_consq_phrase.empty:
-        locs = sorted(set(df_consq_phrase["consequence"].tolist()), key=lambda s: len(s), reverse=True)
-        for loc in locs:
-            pat = re.compile(rf"(?<![A-Za-zÀ-ÖØ-öø-ÿ]){re.escape(loc)}(?![A-Za-zÀ-ÖØ-öø-ÿ])", flags=re.I)
-            m = pat.search(phrase, pos=last_si_end)
-            if m:
-                return phrase[m.end():].strip(" .;:-—")
-    m = re.search(r"[,;:\-\—]\s+", reste)
-    if m:
-        return reste[m.end():].strip(" .;:-—")
-    return reste.strip(" .;:-—")
+def extraire_segments_if(
+    texte: str,
+    motifs_conditions: List[Tuple[str, re.Pattern]],
+    motifs_apodose: List[Tuple[str, re.Pattern]],
+    motifs_alternatives: List[Tuple[str, re.Pattern]],
+) -> List[Dict[str, Any]]:
+    """Extrait les structures conditionnelles « si … alors » / « sinon » à partir des dictionnaires JSON."""
+    if not motifs_conditions:
+        return []
 
-def extraire_segments_if(texte: str, df_consq_global: pd.DataFrame) -> List[Dict[str, Any]]:
-    """Extrait toutes les occurrences 'si ...' ; action si vrai = apodose commune après la dernière condition ; else si 'sinon' présent."""
-    res = []
+    res: List[Dict[str, Any]] = []
     phrases = segmenter_en_phrases(texte)
     for idx, ph in enumerate(phrases, start=1):
-        matches = list(re.finditer(r"\bsi\b|\bs['’]il(?:s)?\b|\bsi\s+l['’]on\b|\bsi\s+on\b", ph, flags=re.I))
-        if not matches:
+        cond_matches = _trouver_occurrences_motifs(ph, motifs_conditions)
+        if not cond_matches:
             continue
 
-        action_false = ""
-        m_sinon = re.search(r"\bsinon\b", ph, flags=re.I)
-        if m_sinon:
-            action_false = ph[m_sinon.end():].strip(" .;:-—")
-
-        cons_this = pd.DataFrame()
-        if df_consq_global is not None and not df_consq_global.empty:
-            cons_this = df_consq_global[df_consq_global["id_phrase"] == idx]
-
-        action_true_gauche = ph[:matches[0].start()].strip(" .;:-—")
-
-        def fin_clause_si(start_pos: int) -> int:
-            sub = ph[start_pos:].strip()
-            m = re.search(r"[,;:\-\—]\s+", sub)
-            if m:
-                return start_pos + m.start()
-            return len(ph)
-
-        last = matches[-1]
-        last_clause_end = fin_clause_si(last.end())
-        action_true_droite = _proposition_principale_apres_dernier_si(ph, last_clause_end, cons_this)
+        action_true_gauche = ph[:cond_matches[0]["start"]].strip(" .;:-—")
+        last_match = cond_matches[-1]
+        last_clause_end = _fin_clause_condition(ph, last_match["end"])
+        action_true_droite = _segment_apres_condition(ph, last_clause_end, motifs_apodose, motifs_alternatives)
         action_true_commune = action_true_gauche if action_true_gauche else action_true_droite
+        action_false = _texte_apres_alternative(ph, last_clause_end, motifs_alternatives)
 
-        for k, m in enumerate(matches):
-            debut_cond = m.end()
-            segment = ph[debut_cond:]
-            m_ponc = re.search(r"[,;:\-\—]\s+", segment)
-            fin_cond_rel = m_ponc.start() if m_ponc else len(segment)
-            if k + 1 < len(matches):
-                fin_cond_rel = min(fin_cond_rel, matches[k+1].start() - debut_cond)
-            condition = segment[:fin_cond_rel].strip()
+        for pos, match in enumerate(cond_matches):
+            next_start: Optional[int] = None
+            if pos + 1 < len(cond_matches):
+                next_start = cond_matches[pos + 1]["start"]
+            condition = _extraire_condition_contenu(ph, match["end"], next_start)
 
             res.append({
                 "type": "IF",
@@ -517,8 +620,8 @@ def extraire_segments_if(texte: str, df_consq_global: pd.DataFrame) -> List[Dict
                 "phrase": ph.strip(),
                 "condition": condition,
                 "action_true": action_true_commune,
-                "action_false": action_false.strip(),
-                "debut": m.start(),
+                "action_false": action_false,
+                "debut": match["start"],
             })
     return res
 
@@ -735,11 +838,28 @@ st.title("Discours → Code : IF / ELSE / WHILE / AND / OR + marqueurs + causes/
 
 # Chargement des dicos
 try:
-    DICO_CONNECTEURS, DICO_MARQUEURS, DICO_CONSQS, DICO_CAUSES = charger_tous_les_dicos()
+    (
+        DICO_CONNECTEURS,
+        DICO_MARQUEURS,
+        DICO_CONSQS,
+        DICO_CAUSES,
+        DICO_CONDITIONS_LOGIQUES,
+        DICO_ALTERNATIVES,
+    ) = charger_tous_les_dicos()
 except Exception as e:
     st.error("Impossible de charger les dictionnaires JSON à la racine.")
     st.code(str(e))
     st.stop()
+
+MOTIFS_CONDITIONS_LOGIQUES = construire_regex_depuis_liste(
+    _expressions_par_etiquette(DICO_CONDITIONS_LOGIQUES, "CONDITION")
+)
+MOTIFS_APODOSES = construire_regex_depuis_liste(
+    _expressions_par_etiquette(DICO_CONDITIONS_LOGIQUES, "APODOSE")
+)
+MOTIFS_ALTERNATIVES = construire_regex_depuis_liste(
+    _expressions_par_etiquette(DICO_ALTERNATIVES, "ALTERNATIVE")
+)
 
 # Alerte spaCy/Graphviz
 if not SPACY_OK:
@@ -794,7 +914,7 @@ ong1, ong2, ong3, ong4, ong5, ong6, ong_stats = st.tabs([
     "Détections",
     "Dictionnaires (JSON)",
     "Guide d’interprétation",
-    "Graphiques (IF / WHILE)",
+    "CONDITIONS LOGIQUES – SI/ALORS",
     "Comparatif Regex / spaCy",
     "Stats",
 ])
@@ -928,6 +1048,10 @@ with ong3:
     st.json(DICO_CONSQS, expanded=False)
     st.markdown("**causes.json**")
     st.json(DICO_CAUSES, expanded=False)
+    st.markdown("**conditions.json**")
+    st.json(DICO_CONDITIONS_LOGIQUES, expanded=False)
+    st.markdown("**alternatives.json**")
+    st.json(DICO_ALTERNATIVES, expanded=False)
 
 # Onglet 4 : Guide d’interprétation
 with ong4:
@@ -976,76 +1100,82 @@ with ong4:
         "« en raison de », « du fait que », « à cause de », « grâce à », « faute de », « suite à », etc."
     )
 
-# Onglet 5 : Graphiques (IF / WHILE)
+# Onglet 5 : CONDITIONS LOGIQUES – SI/ALORS
 with ong5:
-    st.subheader("Boucles WHILE détectées")
+    st.subheader("Segments conditionnels détectés (SI / ALORS / SINON / TANT QUE)")
     if not texte_source.strip():
         st.info("Aucun texte fourni.")
     else:
         seg_while = extraire_segments_while(texte_source)
-        if not seg_while:
-            st.info("Aucune occurrence « tant que … » détectée.")
+        seg_if = extraire_segments_if(
+            texte_source,
+            MOTIFS_CONDITIONS_LOGIQUES,
+            MOTIFS_APODOSES,
+            MOTIFS_ALTERNATIVES,
+        )
+        segments_conditionnels = sorted(
+            seg_while + seg_if,
+            key=lambda s: (s.get("id_phrase", 0), s.get("debut", 0))
+        )
+
+        if not segments_conditionnels:
+            st.info("Aucun segment conditionnel détecté.")
         else:
-            for i, sel in enumerate(seg_while, start=1):
-                st.markdown(f"**WHILE — phrase {sel['id_phrase']}**")
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.markdown("Condition")
-                    st.write(sel["condition"] if sel["condition"] else "(non extraite)")
-                with col2:
-                    st.markdown("Action (itération)")
-                    st.write(sel["action_true"] if sel["action_true"] else "(implicite ou non extraite)")
+            for idx_seg, sel in enumerate(segments_conditionnels, start=1):
+                type_sel = str(sel.get("type", "")).upper()
+                if type_sel == "WHILE":
+                    st.markdown(f"**WHILE — phrase {sel['id_phrase']}**")
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.markdown("Condition")
+                        st.write(sel["condition"] if sel["condition"] else "(non extraite)")
+                    with col2:
+                        st.markdown("Action (itération)")
+                        st.write(sel["action_true"] if sel["action_true"] else "(implicite ou non extraite)")
 
-                dot = graphviz_while_dot(sel["condition"], sel["action_true"])
-                st.graphviz_chart(dot, use_container_width=True)
+                    dot = graphviz_while_dot(sel["condition"], sel["action_true"])
+                    st.graphviz_chart(dot, use_container_width=True)
 
-                if GV_OK:
-                    try:
-                        img_bytes = rendre_jpeg_depuis_dot(dot)
-                        st.download_button(f"Télécharger le graphe WHILE #{sel['id_phrase']} (JPEG)",
-                                           data=img_bytes,
-                                           file_name=f"while_phrase_{sel['id_phrase']}.jpg",
-                                           mime="image/jpeg",
-                                           key=f"dl_while_jpg_{sel['id_phrase']}_{i}")
-                    except Exception as e:
-                        st.error(f"Export JPEG indisponible : {e}")
+                    if GV_OK:
+                        try:
+                            img_bytes = rendre_jpeg_depuis_dot(dot)
+                            st.download_button(
+                                f"Télécharger le graphe WHILE #{sel['id_phrase']} (JPEG)",
+                                data=img_bytes,
+                                file_name=f"while_phrase_{sel['id_phrase']}.jpg",
+                                mime="image/jpeg",
+                                key=f"dl_while_jpg_{sel['id_phrase']}_{idx_seg}"
+                            )
+                        except Exception as e:
+                            st.error(f"Export JPEG indisponible : {e}")
+                else:
+                    st.markdown(f"**IF — phrase {sel['id_phrase']}**")
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        st.markdown("Condition (if)")
+                        st.write(sel["condition"] if sel["condition"] else "(non extraite)")
+                    with col2:
+                        st.markdown("Action si Vrai (alors)")
+                        st.write(sel["action_true"] if sel["action_true"] else "(implicite ou non extraite)")
+                    with col3:
+                        st.markdown("Action si Faux (else)")
+                        st.write(sel["action_false"] if sel["action_false"] else "(absente)")
 
-                with st.expander("Voir la phrase complète"):
-                    st.write(sel["phrase"])
-                st.markdown("---")
+                    dot = graphviz_if_dot(sel["condition"], sel["action_true"], sel["action_false"])
+                    st.graphviz_chart(dot, use_container_width=True)
 
-        st.subheader("Conditions IF détectées (toutes occurrences)")
-        df_consq_for_if = df_consq_lex if not df_consq_lex.empty else pd.DataFrame()
-        seg_if = extraire_segments_if(texte_source, df_consq_for_if)
-        if not seg_if:
-            st.info("Aucune condition « si … » détectée.")
-        else:
-            for j, sel in enumerate(seg_if, start=1):
-                st.markdown(f"**IF — phrase {sel['id_phrase']}**")
-                col1, col2, col3 = st.columns(3)
-                with col1:
-                    st.markdown("Condition (if)")
-                    st.write(sel["condition"] if sel["condition"] else "(non extraite)")
-                with col2:
-                    st.markdown("Action si Vrai")
-                    st.write(sel["action_true"] if sel["action_true"] else "(implicite ou non extraite)")
-                with col3:
-                    st.markdown("Action si Faux (else)")
-                    st.write(sel["action_false"] if sel["action_false"] else "(absente)")
-
-                dot = graphviz_if_dot(sel["condition"], sel["action_true"], sel["action_false"])
-                st.graphviz_chart(dot, use_container_width=True)
-
-                if GV_OK:
-                    try:
-                        img_bytes = rendre_jpeg_depuis_dot(dot)
-                        st.download_button(f"Télécharger le graphe IF #{sel['id_phrase']} (JPEG)",
-                                           data=img_bytes,
-                                           file_name=f"if_phrase_{sel['id_phrase']}.jpg",
-                                           mime="image/jpeg",
-                                           key=f"dl_if_jpg_{sel['id_phrase']}_{j}")
-                    except Exception as e:
-                        st.error(f"Export JPEG indisponible : {e}")
+                    if GV_OK:
+                        try:
+                            img_bytes = rendre_jpeg_depuis_dot(dot)
+                            st.download_button(
+                                f"Télécharger le graphe IF #{sel['id_phrase']} (JPEG)",
+                                data=img_bytes,
+                                file_name=f"if_phrase_{sel['id_phrase']}.jpg",
+                                mime="image/jpeg",
+                                key=f"dl_if_jpg_{sel['id_phrase']}_{idx_seg}"
+                            )
+                        except Exception as e:
+                            st.error(f"Export JPEG indisponible : {e}")
 
                 with st.expander("Voir la phrase complète"):
                     st.write(sel["phrase"])
