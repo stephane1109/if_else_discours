@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
-# main.py — Discours → Code (IF / ELSE / WHILE / AND / OR) + Marqueurs + Causes/Conséquences
+# main.py — Discours → Code (SI / ALORS / SINON / TANT QUE) + Marqueurs + Causes/Conséquences
 # Méthodes comparées : Regex vs spaCy (transformer si disponible)
 #
 # Fichiers requis à la racine (même dossier que ce script) :
-#   - dic_code.json          : mapping des connecteurs → familles Python (IF/ELSE/WHILE/AND/OR)
+#   - conditions.json        : mapping des segments conditionnels → CONDITION / ALORS / WHILE
+#   - alternatives.json      : déclencheurs d’alternative → "ALTERNATIVE"
 #   - dict_marqueurs.json    : marqueurs normatifs (OBLIGATION/INTERDICTION/…)
 #   - consequences.json      : déclencheurs de conséquence → "CONSEQUENCE"
 #   - causes.json            : déclencheurs de cause → "CAUSE"
@@ -11,7 +12,7 @@
 # Remarques :
 #   - L’extraction CAUSE→CONSEQUENCE spaCy exploite la dépendance/les ancres causales et consécutives.
 #   - Négation « ne … pouvoir … (pas/plus/jamais) » : ajustement par regex (sans options supplémentaires).
-#   - Graphes IF/WHILE : rendu DOT (à l’écran) + export JPEG si Graphviz est présent (binaire 'dot').
+#   - Graphes conditionnels (IF/SI) et WHILE : rendu DOT (à l’écran) + export JPEG si Graphviz est présent (binaire 'dot').
 
 import os
 import re
@@ -89,15 +90,38 @@ except Exception as err:
 # Palettes / libellés Python (affichage)
 # =========================
 CODE_VERS_PYTHON: Dict[str, str] = {
-    "IF": "if", "ELSE": "else", "WHILE": "while", "AND": "and", "OR": "or"
+    "CONDITION": "if",
+    "ALORS": "then",
+    "ALTERNATIVE": "else",
+    "WHILE": "while",
+    # Compatibilité ascendante
+    "IF": "if",
+    "ELSE": "else",
+    "AND": "and",
+    "OR": "or",
 }
 
 COULEURS_BADGES: Dict[str, Dict[str, str]] = {
+    "CONDITION": {"bg": "#e6f0ff", "fg": "#0b5ed7", "bd": "#0b5ed7"},
+    "ALORS": {"bg": "#fff3e6", "fg": "#b54b00", "bd": "#b54b00"},
+    "ALTERNATIVE": {"bg": "#f3e8ff", "fg": "#6f42c1", "bd": "#6f42c1"},
+    "WHILE": {"bg": "#e9fbe6", "fg": "#2f7d32", "bd": "#2f7d32"},
+    # Compatibilité ascendante
     "IF": {"bg": "#e6f0ff", "fg": "#0b5ed7", "bd": "#0b5ed7"},
     "ELSE": {"bg": "#f3e8ff", "fg": "#6f42c1", "bd": "#6f42c1"},
-    "WHILE": {"bg": "#e9fbe6", "fg": "#2f7d32", "bd": "#2f7d32"},
     "AND": {"bg": "#e6fffb", "fg": "#0d9488", "bd": "#0d9488"},
     "OR": {"bg": "#fff3e6", "fg": "#b54b00", "bd": "#b54b00"},
+}
+
+LIBELLES_CODES: Dict[str, str] = {
+    "CONDITION": "CONDITION (si)",
+    "ALORS": "ALORS (apodose)",
+    "ALTERNATIVE": "ALTERNATIVE (sinon)",
+    "WHILE": "WHILE (tant que)",
+    "AND": "AND (et)",
+    "OR": "OR (ou)",
+    "IF": "IF (si)",
+    "ELSE": "ELSE (sinon)",
 }
 
 COULEURS_MARQUEURS: Dict[str, Dict[str, str]] = {
@@ -111,8 +135,6 @@ COULEURS_MARQUEURS: Dict[str, Dict[str, str]] = {
     "CONSEQUENCE": {"bg": "#fff0f0", "fg": "#b00020", "bd": "#b00020"},
     "CAUSE": {"bg": "#f0fff4", "fg": "#2f855a", "bd": "#2f855a"},
 }
-
-FAMILLES_CONNECTEURS = {"IF", "ELSE", "WHILE", "AND", "OR"}
 FAMILLES_MARQUEURS_STANDARD = {
     "OBLIGATION", "INTERDICTION", "PERMISSION", "RECOMMANDATION", "SANCTION", "CADRE_OUVERTURE", "CADRE_FERMETURE"
 }
@@ -227,16 +249,16 @@ def _extraire_condition_contenu(phrase: str, match_end: int, next_start: Optiona
 def _segment_apres_condition(
     phrase: str,
     clause_end: int,
-    motifs_apodose: List[Tuple[str, re.Pattern]],
+    motifs_alors: List[Tuple[str, re.Pattern]],
     motifs_alt: List[Tuple[str, re.Pattern]],
 ) -> str:
-    """Retourne l’apodose commune après la dernière condition, en rognant l’éventuelle alternative."""
+    """Retourne l’apodose (segment ALORS) après la dernière condition, en rognant l’éventuelle alternative."""
     suite = phrase[clause_end:] if clause_end < len(phrase) else ""
     suite = suite.lstrip(" ,;:-—")
     if not suite:
         return ""
-    if motifs_apodose:
-        match_apod = _premier_match_motifs(phrase, motifs_apodose, start=clause_end)
+    if motifs_alors:
+        match_apod = _premier_match_motifs(phrase, motifs_alors, start=clause_end)
         if match_apod:
             suite = phrase[match_apod.end():].lstrip(" ,;:-—")
     if not suite:
@@ -278,28 +300,21 @@ def charger_json_dico(chemin: str) -> Dict[str, str]:
         raise ValueError(f"Format JSON non supporté (attendu dict) : {chemin}")
     return {normaliser_espace(k.lower()): str(v).upper() for k, v in data.items() if k and str(k).strip()}
 
-def charger_tous_les_dicos() -> Tuple[
-    Dict[str, str],
+def charger_dicos_conditions() -> Tuple[
     Dict[str, str],
     Dict[str, str],
     Dict[str, str],
     Dict[str, str],
     Dict[str, str],
 ]:
-    """Charge tous les dictionnaires JSON requis à la racine du projet."""
+    """Charge les dictionnaires nécessaires au modèle SI / ALORS / SINON."""
     cwd = os.getcwd()
-    d_code = charger_json_dico(os.path.join(cwd, "dic_code.json"))
+    d_cond = charger_json_dico(os.path.join(cwd, "conditions.json"))
+    d_alt = charger_json_dico(os.path.join(cwd, "alternatives.json"))
     d_marq = charger_json_dico(os.path.join(cwd, "dict_marqueurs.json"))
     d_cons = charger_json_dico(os.path.join(cwd, "consequences.json"))
     d_caus = charger_json_dico(os.path.join(cwd, "causes.json"))
-    d_cond = charger_json_dico(os.path.join(cwd, "conditions.json"))
-    d_alt = charger_json_dico(os.path.join(cwd, "alternatives.json"))
-
-    codes_utilises = set(d_code.values())
-    attendus = FAMILLES_CONNECTEURS
-    if not codes_utilises.issubset(attendus):
-        raise ValueError(f"dic_code.json contient des familles inconnues : {sorted(list(codes_utilises - attendus))}")
-    return d_code, d_marq, d_cons, d_caus, d_cond, d_alt
+    return d_cond, d_alt, d_marq, d_cons, d_caus
 
 # =========================
 # I/O discours
@@ -587,7 +602,7 @@ def extraire_segments_while(texte: str) -> List[Dict[str, Any]]:
 def extraire_segments_if(
     texte: str,
     motifs_conditions: List[Tuple[str, re.Pattern]],
-    motifs_apodose: List[Tuple[str, re.Pattern]],
+    motifs_alors: List[Tuple[str, re.Pattern]],
     motifs_alternatives: List[Tuple[str, re.Pattern]],
 ) -> List[Dict[str, Any]]:
     """Extrait les structures conditionnelles « si … alors » / « sinon » à partir des dictionnaires JSON."""
@@ -604,7 +619,7 @@ def extraire_segments_if(
         action_true_gauche = ph[:cond_matches[0]["start"]].strip(" .;:-—")
         last_match = cond_matches[-1]
         last_clause_end = _fin_clause_condition(ph, last_match["end"])
-        action_true_droite = _segment_apres_condition(ph, last_clause_end, motifs_apodose, motifs_alternatives)
+        action_true_droite = _segment_apres_condition(ph, last_clause_end, motifs_alors, motifs_alternatives)
         action_true_commune = action_true_gauche if action_true_gauche else action_true_droite
         action_false = _texte_apres_alternative(ph, last_clause_end, motifs_alternatives)
 
@@ -834,32 +849,32 @@ def table_spacy_df(df_spacy: pd.DataFrame) -> pd.DataFrame:
 # =========================
 st.set_page_config(page_title="Discours → Code (Regex vs spaCy + JSON racine)", page_icon=None, layout="wide")
 st.markdown(css_checkboxes_alignment(), unsafe_allow_html=True)
-st.title("Discours → Code : IF / ELSE / WHILE / AND / OR + marqueurs + causes/conséquences (Regex vs spaCy)")
+st.title("Discours → Code : SI / ALORS / SINON / TANT QUE + marqueurs + causes/conséquences (Regex vs spaCy)")
 
 # Chargement des dicos
 try:
     (
-        DICO_CONNECTEURS,
+        DICO_CONDITIONS,
+        DICO_ALTERNATIVES,
         DICO_MARQUEURS,
         DICO_CONSQS,
         DICO_CAUSES,
-        DICO_CONDITIONS_LOGIQUES,
-        DICO_ALTERNATIVES,
-    ) = charger_tous_les_dicos()
+    ) = charger_dicos_conditions()
 except Exception as e:
     st.error("Impossible de charger les dictionnaires JSON à la racine.")
     st.code(str(e))
     st.stop()
 
-MOTIFS_CONDITIONS_LOGIQUES = construire_regex_depuis_liste(
-    _expressions_par_etiquette(DICO_CONDITIONS_LOGIQUES, "CONDITION")
-)
-MOTIFS_APODOSES = construire_regex_depuis_liste(
-    _expressions_par_etiquette(DICO_CONDITIONS_LOGIQUES, "APODOSE")
-)
-MOTIFS_ALTERNATIVES = construire_regex_depuis_liste(
-    _expressions_par_etiquette(DICO_ALTERNATIVES, "ALTERNATIVE")
-)
+DICO_CONNECTEURS: Dict[str, str] = {**DICO_CONDITIONS, **DICO_ALTERNATIVES}
+
+COND_TERMS = {k for k, v in DICO_CONDITIONS.items() if str(v).upper() == "CONDITION"}
+ALORS_TERMS = {k for k, v in DICO_CONDITIONS.items() if str(v).upper() == "ALORS"}
+WHILE_TERMS = {k for k, v in DICO_CONDITIONS.items() if str(v).upper() == "WHILE"}
+ALT_TERMS = set(DICO_ALTERNATIVES.keys())
+
+MOTIFS_CONDITIONS = construire_regex_depuis_liste(sorted(COND_TERMS))
+MOTIFS_ALORS = construire_regex_depuis_liste(sorted(ALORS_TERMS))
+MOTIFS_ALTERNATIVES = construire_regex_depuis_liste(sorted(ALT_TERMS))
 
 # Alerte spaCy/Graphviz
 if not SPACY_OK:
@@ -921,7 +936,7 @@ ong1, ong2, ong3, ong4, ong5, ong6, ong_stats = st.tabs([
 
 # Onglet 1 : Expressions mappées
 with ong1:
-    st.subheader("Expressions françaises mappées vers une famille Python (if / else / while / and / or)")
+    st.subheader("Expressions françaises mappées vers une famille conditionnelle (si / alors / sinon / tant que)")
     if not DICO_CONNECTEURS:
         st.info("Aucun connecteur chargé.")
     else:
@@ -987,16 +1002,13 @@ with ong2:
     st.subheader("Texte annoté")
 
     # Cases à cocher pour les familles de connecteurs et marqueurs
-    st.markdown("**Familles de connecteurs**")
-    show_codes = {}
-    for code, label in [
-        ("IF", "IF (si)"),
-        ("ELSE", "ELSE (sinon)"),
-        ("WHILE", "WHILE (tant que)"),
-        ("AND", "AND (et)"),
-        ("OR", "OR (ou)"),
-    ]:
-        show_codes[code] = st.checkbox(label, value=True, key=f"chk_code_{code.lower()}")
+    codes_disponibles = sorted({str(v).upper() for v in DICO_CONNECTEURS.values()})
+    show_codes: Dict[str, bool] = {}
+    if codes_disponibles:
+        st.markdown("**Familles de connecteurs**")
+        for code in codes_disponibles:
+            label = LIBELLES_CODES.get(code, code)
+            show_codes[code] = st.checkbox(label, value=True, key=f"chk_code_{code.lower()}")
 
     categories_normatives = sorted({str(v).upper() for v in DICO_MARQUEURS.values()})
     show_marqueurs_categories: Dict[str, bool] = {}
@@ -1040,49 +1052,53 @@ with ong2:
 # Onglet 3 : Dictionnaires (JSON)
 with ong3:
     st.subheader("Aperçu des dictionnaires chargés (racine)")
-    st.markdown("**dic_code.json**")
-    st.json(DICO_CONNECTEURS, expanded=False)
+    st.markdown("**conditions.json**")
+    st.json(DICO_CONDITIONS, expanded=False)
+    st.markdown("**alternatives.json**")
+    st.json(DICO_ALTERNATIVES, expanded=False)
     st.markdown("**dict_marqueurs.json**")
     st.json(DICO_MARQUEURS, expanded=False)
     st.markdown("**consequences.json**")
     st.json(DICO_CONSQS, expanded=False)
     st.markdown("**causes.json**")
     st.json(DICO_CAUSES, expanded=False)
-    st.markdown("**conditions.json**")
-    st.json(DICO_CONDITIONS_LOGIQUES, expanded=False)
-    st.markdown("**alternatives.json**")
-    st.json(DICO_ALTERNATIVES, expanded=False)
 
 # Onglet 4 : Guide d’interprétation
 with ong4:
     st.subheader("Guide d’interprétation : Python vs analyse de discours")
 
-    st.markdown("#### IF")
+    st.markdown("#### CONDITION (SI)")
     st.write(
         "Cadre Python : `if` introduit une condition booléenne ; le bloc indenté s’exécute si la condition est vraie. "
         "On peut enchaîner `elif` puis `else` ; la condition évalue `True/False` (valeurs truthy/falsy admises).\n\n"
         "Cadre analyse : « si », « à condition que », « pourvu que », « au cas où » posent une condition d’acceptabilité ou de mise en œuvre."
     )
 
-    st.markdown("#### ELSE")
+    st.markdown("#### ALORS")
+    st.write(
+        "Cadre Python : la partie `then` n’existe pas explicitement mais correspond au bloc exécuté lorsque la condition est vraie.\n\n"
+        "Cadre analyse : « alors », « dès lors », « par conséquent », « ainsi » introduisent l’apodose, c’est-à-dire le résultat attendu si la condition est satisfaite."
+    )
+
+    st.markdown("#### ALTERNATIVE (SINON)")
     st.write(
         "Cadre Python : `else` est la branche alternative quand la condition est fausse.\n\n"
         "Cadre analyse : « sinon », « autrement », « à défaut » marquent l’alternative par défaut ou le coût si la condition n’est pas remplie."
     )
 
-    st.markdown("#### WHILE")
+    st.markdown("#### WHILE (TANT QUE)")
     st.write(
         "Cadre Python : `while` répète un bloc tant que l’expression reste vraie ; `break` sort ; `continue` saute l’itération suivante.\n\n"
         "Cadre analyse : « tant que » exprime une persistance conditionnelle (maintien d’une action tant qu’un état perdure)."
     )
 
-    st.markdown("#### AND")
+    st.markdown("#### AND (ET)")
     st.write(
         "Cadre Python : `and` exige que toutes les sous-conditions soient vraies (court-circuit logique).\n\n"
         "Cadre analyse : « et », « ainsi que » agrègent des critères/engagements pour construire un front commun."
     )
 
-    st.markdown("#### OR")
+    st.markdown("#### OR (OU)")
     st.write(
         "Cadre Python : `or` vaut vrai si au moins une sous-condition est vraie (court-circuit).\n\n"
         "Cadre analyse : « ou », « ou bien », « soit » posent des alternatives."
@@ -1109,8 +1125,8 @@ with ong5:
         seg_while = extraire_segments_while(texte_source)
         seg_if = extraire_segments_if(
             texte_source,
-            MOTIFS_CONDITIONS_LOGIQUES,
-            MOTIFS_APODOSES,
+            MOTIFS_CONDITIONS,
+            MOTIFS_ALORS,
             MOTIFS_ALTERNATIVES,
         )
         segments_conditionnels = sorted(
