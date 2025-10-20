@@ -11,6 +11,5 @@ spacy==3.7.4
 typer==0.9.0
 click==8.1.7
 # Modèle français standard (taille moyenne) compatible spaCy 3.7.x
-fr_core_news_md==3.7.2
-# Distribution pip officielle du modèle spaCy moyen (nécessaire pour « pip install -r requirements.txt »)
+# (sur PyPI la distribution officielle utilise des tirets et non des underscores)
 fr-core-news-md==3.7.2
