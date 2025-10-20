@@ -246,42 +246,6 @@ def _extraire_condition_contenu(phrase: str, match_end: int, next_start: Optiona
         limite = min(limite, max(0, next_start - match_end))
     return segment[:limite].strip(" .;:-—")
 
-def _segment_apres_condition(
-    phrase: str,
-    clause_end: int,
-    motifs_alors: List[Tuple[str, re.Pattern]],
-    motifs_alt: List[Tuple[str, re.Pattern]],
-) -> str:
-    """Retourne l’apodose (segment ALORS) après la dernière condition, en rognant l’éventuelle alternative."""
-    suite = phrase[clause_end:] if clause_end < len(phrase) else ""
-    suite = suite.lstrip(" ,;:-—")
-    if not suite:
-        return ""
-    if motifs_alors:
-        match_apod = _premier_match_motifs(phrase, motifs_alors, start=clause_end)
-        if match_apod:
-            suite = phrase[match_apod.end():].lstrip(" ,;:-—")
-    if not suite:
-        return ""
-    if motifs_alt:
-        alt_match = _premier_match_motifs(suite, motifs_alt, start=0, require_boundary=True, skip_short=True)
-        if alt_match:
-            suite = suite[:alt_match.start()]
-    return suite.strip(" .;:-—")
-
-def _texte_apres_alternative(
-    phrase: str,
-    clause_end: int,
-    motifs_alt: List[Tuple[str, re.Pattern]],
-) -> str:
-    """Extrait la branche alternative (else) si un déclencheur est présent après la condition."""
-    if not motifs_alt:
-        return ""
-    match_alt = _premier_match_motifs(phrase, motifs_alt, start=clause_end, require_boundary=True, skip_short=True)
-    if not match_alt:
-        return ""
-    return phrase[match_alt.end():].strip(" .;:-—")
-
 def _expressions_par_etiquette(dico: Dict[str, str], etiquette: str) -> List[str]:
     """Filtre les expressions d’un dictionnaire selon leur étiquette normalisée."""
     cible = etiquette.upper()
@@ -599,46 +563,117 @@ def extraire_segments_while(texte: str) -> List[Dict[str, Any]]:
             })
     return res
 
-def extraire_segments_if(
-    texte: str,
-    motifs_conditions: List[Tuple[str, re.Pattern]],
-    motifs_alors: List[Tuple[str, re.Pattern]],
-    motifs_alternatives: List[Tuple[str, re.Pattern]],
-) -> List[Dict[str, Any]]:
-    """Extrait les structures conditionnelles « si … alors » / « sinon » à partir des dictionnaires JSON."""
-    if not motifs_conditions:
+def extraire_segments_if(texte: str) -> List[Dict[str, Any]]:
+    """Extrait les structures conditionnelles « si … alors / sinon » en combinant phrases adjacentes."""
+    if not texte or not COND_TERMS:
         return []
 
-    res: List[Dict[str, Any]] = []
+    COND_PAT = r"|".join(re.escape(x) for x in sorted(COND_TERMS, key=len, reverse=True))
+    ALORS_PAT = r"|".join(re.escape(x) for x in sorted(ALORS_TERMS, key=len, reverse=True))
+    ALT_PAT = r"|".join(re.escape(x) for x in sorted(ALT_TERMS, key=len, reverse=True))
+    WH_PAT = (
+        r"|".join(re.escape(x) for x in sorted(WHILE_TERMS, key=len, reverse=True))
+        if WHILE_TERMS else r"\btant\s+que\b"
+    )
+
+    alpha = "A-Za-zÀ-ÖØ-öø-ÿ"
+    cond_re = re.compile(rf"(?<![{alpha}])(?:{COND_PAT})(?![{alpha}])", flags=re.I)
+    alors_re = re.compile(rf"(?<![{alpha}])(?:{ALORS_PAT})(?![{alpha}])", flags=re.I) if ALORS_PAT else None
+    alt_re = re.compile(rf"(?<![{alpha}])(?:{ALT_PAT})(?![{alpha}])", flags=re.I) if ALT_PAT else None
+    alt_head_re = re.compile(rf"^\s*(?:{ALT_PAT})(?![{alpha}])", flags=re.I) if ALT_PAT else None
+    alors_head_re = re.compile(rf"^\s*(?:{ALORS_PAT})(?![{alpha}])", flags=re.I) if ALORS_PAT else None
+    while_re = re.compile(rf"(?<![{alpha}])(?:{WH_PAT})(?![{alpha}])", flags=re.I)
+
+    segments: List[Dict[str, Any]] = []
     phrases = segmenter_en_phrases(texte)
-    for idx, ph in enumerate(phrases, start=1):
-        cond_matches = _trouver_occurrences_motifs(ph, motifs_conditions)
+
+    for idx, phrase in enumerate(phrases):
+        phrase_id = idx + 1
+        if not phrase.strip():
+            continue
+
+        while_spans = [(m.start(), m.end()) for m in while_re.finditer(phrase)] if WH_PAT else []
+
+        cond_matches: List[Dict[str, Any]] = []
+        for m in cond_re.finditer(phrase):
+            if any(start <= m.start() < end for start, end in while_spans):
+                continue
+            cond_matches.append({
+                "start": m.start(),
+                "end": m.end(),
+                "match": m.group(),
+            })
+
         if not cond_matches:
             continue
 
-        action_true_gauche = ph[:cond_matches[0]["start"]].strip(" .;:-—")
-        last_match = cond_matches[-1]
-        last_clause_end = _fin_clause_condition(ph, last_match["end"])
-        action_true_droite = _segment_apres_condition(ph, last_clause_end, motifs_alors, motifs_alternatives)
-        action_true_commune = action_true_gauche if action_true_gauche else action_true_droite
-        action_false = _texte_apres_alternative(ph, last_clause_end, motifs_alternatives)
+        last_end = cond_matches[-1]["end"]
+        reste = phrase[last_end:]
+        strip_len = len(reste) - len(reste.lstrip(" ,;:-—"))
+        apres_cond_start = last_end + strip_len
+
+        alt_match_current = alt_re.search(phrase, apres_cond_start) if alt_re else None
+        alors_match_current = alors_re.search(phrase, apres_cond_start) if alors_re else None
+
+        action_true_phrase_index = idx
+        action_true_start = apres_cond_start
+        action_true_segments: List[str] = []
+        action_false = ""
+
+        if alors_match_current:
+            action_true_start = alors_match_current.end()
+        elif alors_head_re and idx + 1 < len(phrases):
+            prochain = phrases[idx + 1]
+            match_next = alors_head_re.match(prochain)
+            if match_next:
+                action_true_phrase_index = idx + 1
+                action_true_start = match_next.end()
+        if action_true_phrase_index != idx and apres_cond_start < len(phrase):
+            limite = alt_match_current.start() if alt_match_current else len(phrase)
+            if apres_cond_start < limite:
+                segment = phrase[apres_cond_start:limite].strip(" .;:-—")
+                if segment:
+                    action_true_segments.append(segment)
+
+        action_phrase = phrases[action_true_phrase_index]
+        alt_match_action = alt_re.search(action_phrase, action_true_start) if alt_re else None
+
+        if alt_match_action:
+            action_segment = action_phrase[action_true_start:alt_match_action.start()].strip(" .;:-—")
+            action_false = action_phrase[alt_match_action.end():].strip(" .;:-—")
+        else:
+            action_segment = action_phrase[action_true_start:].strip(" .;:-—")
+
+        if action_segment:
+            action_true_segments.append(action_segment)
+
+        if not action_false and alt_head_re:
+            suivant_index = action_true_phrase_index + 1
+            if suivant_index < len(phrases):
+                phrase_suiv = phrases[suivant_index]
+                alt_suivant = alt_head_re.match(phrase_suiv) or (alt_re.search(phrase_suiv) if alt_re else None)
+                if alt_suivant:
+                    action_false = phrase_suiv[alt_suivant.end():].strip(" .;:-—")
+
+        action_true = " ".join(part for part in action_true_segments if part).strip()
 
         for pos, match in enumerate(cond_matches):
             next_start: Optional[int] = None
             if pos + 1 < len(cond_matches):
                 next_start = cond_matches[pos + 1]["start"]
-            condition = _extraire_condition_contenu(ph, match["end"], next_start)
+            condition = _extraire_condition_contenu(phrase, match["end"], next_start)
 
-            res.append({
+            segments.append({
                 "type": "IF",
-                "id_phrase": idx,
-                "phrase": ph.strip(),
+                "id_phrase": phrase_id,
+                "phrase": phrase.strip(),
                 "condition": condition,
-                "action_true": action_true_commune,
+                "action_true": action_true,
                 "action_false": action_false,
                 "debut": match["start"],
             })
-    return res
+
+    return segments
 
 def graphviz_while_dot(condition: str, action: str) -> str:
     """Construit un DOT simple pour WHILE."""
@@ -871,10 +906,6 @@ COND_TERMS = {k for k, v in DICO_CONDITIONS.items() if str(v).upper() == "CONDIT
 ALORS_TERMS = {k for k, v in DICO_CONDITIONS.items() if str(v).upper() == "ALORS"}
 WHILE_TERMS = {k for k, v in DICO_CONDITIONS.items() if str(v).upper() == "WHILE"}
 ALT_TERMS = set(DICO_ALTERNATIVES.keys())
-
-MOTIFS_CONDITIONS = construire_regex_depuis_liste(sorted(COND_TERMS))
-MOTIFS_ALORS = construire_regex_depuis_liste(sorted(ALORS_TERMS))
-MOTIFS_ALTERNATIVES = construire_regex_depuis_liste(sorted(ALT_TERMS))
 
 # Alerte spaCy/Graphviz
 if not SPACY_OK:
@@ -1123,12 +1154,7 @@ with ong5:
         st.info("Aucun texte fourni.")
     else:
         seg_while = extraire_segments_while(texte_source)
-        seg_if = extraire_segments_if(
-            texte_source,
-            MOTIFS_CONDITIONS,
-            MOTIFS_ALORS,
-            MOTIFS_ALTERNATIVES,
-        )
+        seg_if = extraire_segments_if(texte_source)
         segments_conditionnels = sorted(
             seg_while + seg_if,
             key=lambda s: (s.get("id_phrase", 0), s.get("debut", 0))
