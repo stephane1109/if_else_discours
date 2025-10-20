@@ -25,6 +25,15 @@ from typing import List, Dict, Tuple, Any, Optional
 
 from stats import render_stats_tab
 
+try:
+    from detect_cooccu import detect_tensions
+    TENSION_ANALYSE_OK = True
+    TENSION_ANALYSE_ERR = ""
+except Exception as err:  # pragma: no cover - dépend du fichier JSON externe
+    detect_tensions = None
+    TENSION_ANALYSE_OK = False
+    TENSION_ANALYSE_ERR = str(err)
+
 # =========================
 # Détection Graphviz (pour export JPEG)
 # =========================
@@ -940,6 +949,14 @@ with st.sidebar:
     st.header("Méthodes d’analyse")
     use_regex_cc = st.checkbox("Causalité par Regex (dictionnaires JSON)", value=True)
     use_spacy_cc = st.checkbox("Causalité par spaCy (analyse NLP)", value=SPACY_OK)
+    use_tension_sem = st.checkbox(
+        "Tensions sémantiques (tension_semantique.json)",
+        value=False,
+        disabled=not TENSION_ANALYSE_OK,
+        help="Analyse contrastive fondée sur le fichier tension_semantique.json"
+    )
+    if not TENSION_ANALYSE_OK:
+        st.caption(f"Analyse des tensions indisponible : {TENSION_ANALYSE_ERR}")
 
 # Source du discours
 st.markdown("### Source du discours")
@@ -967,12 +984,21 @@ if texte_source.strip():
     df_memoires = detecter_memoires(texte_source, DICO_MEMOIRES)
     df_consq_lex = detecter_consequences_lex(texte_source, DICO_CONSQS) if use_regex_cc else pd.DataFrame()
     df_causes_lex = detecter_causes_lex(texte_source, DICO_CAUSES) if use_regex_cc else pd.DataFrame()
+    if use_tension_sem and TENSION_ANALYSE_OK and detect_tensions is not None:
+        try:
+            df_tensions = pd.DataFrame(detect_tensions(texte_source))
+        except Exception as err:
+            df_tensions = pd.DataFrame()
+            st.warning(f"Échec de l'analyse des tensions sémantiques : {err}")
+    else:
+        df_tensions = pd.DataFrame()
 else:
     df_conn = pd.DataFrame()
     df_marq = pd.DataFrame()
     df_memoires = pd.DataFrame()
     df_consq_lex = pd.DataFrame()
     df_causes_lex = pd.DataFrame()
+    df_tensions = pd.DataFrame()
 
 # Onglets
 ong1, ong2, ong3, ong4, ong5, ong6, ong_stats = st.tabs([
@@ -1020,6 +1046,24 @@ with ong2:
                            data=df_marq.to_csv(index=False).encode("utf-8"),
                            file_name="occurrences_marqueurs.csv", mime="text/csv",
                            key="dl_occ_marq_csv")
+
+    st.subheader("Tensions sémantiques détectées")
+    if not use_tension_sem:
+        st.info("Analyse des tensions désactivée (activez la case à cocher dans la barre latérale).")
+    elif not TENSION_ANALYSE_OK or detect_tensions is None:
+        st.warning("Analyse des tensions indisponible : consultez le message de la barre latérale.")
+    else:
+        if df_tensions.empty:
+            st.info("Aucune tension sémantique détectée dans le texte.")
+        else:
+            st.dataframe(df_tensions, use_container_width=True, hide_index=True)
+            st.download_button(
+                "Exporter tensions sémantiques (CSV)",
+                data=df_tensions.to_csv(index=False).encode("utf-8"),
+                file_name="tensions_semantiques.csv",
+                mime="text/csv",
+                key="dl_occ_tensions_csv",
+            )
 
     st.subheader("Marqueurs mémoire détectés")
     if df_memoires.empty:
