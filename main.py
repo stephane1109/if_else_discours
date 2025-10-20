@@ -25,15 +25,6 @@ from typing import List, Dict, Tuple, Any, Optional
 
 from stats import render_stats_tab
 
-try:
-    from detect_cooccu import detect_tensions
-    TENSION_ANALYSE_OK = True
-    TENSION_ANALYSE_ERR = ""
-except Exception as err:  # pragma: no cover - dépend du fichier JSON externe
-    detect_tensions = None
-    TENSION_ANALYSE_OK = False
-    TENSION_ANALYSE_ERR = str(err)
-
 # =========================
 # Détection Graphviz (pour export JPEG)
 # =========================
@@ -279,6 +270,7 @@ def charger_dicos_conditions() -> Tuple[
     Dict[str, str],
     Dict[str, str],
     Dict[str, str],
+    Dict[str, str],
 ]:
     """Charge les dictionnaires nécessaires au modèle SI / ALORS / SINON."""
     cwd = os.getcwd()
@@ -288,7 +280,8 @@ def charger_dicos_conditions() -> Tuple[
     d_cons = charger_json_dico(os.path.join(cwd, "consequences.json"))
     d_caus = charger_json_dico(os.path.join(cwd, "causes.json"))
     d_mem = charger_json_dico(os.path.join(cwd, "souvenirs.json"))
-    return d_cond, d_alt, d_marq, d_cons, d_caus, d_mem
+    d_tension = charger_json_dico(os.path.join(cwd, "tension_semantique.json"))
+    return d_cond, d_alt, d_marq, d_cons, d_caus, d_mem, d_tension
 
 # =========================
 # I/O discours
@@ -352,6 +345,10 @@ def detecter_causes_lex(texte: str, dico_causes: Dict[str, str]) -> pd.DataFrame
     # On ajoute une colonne 'cause' pour homogénéiser les affichages regex
     df = detecter_par_dico(texte, dico_causes, "cause", "categorie")
     return df
+
+def detecter_tensions_semantiques(texte: str, dico_tensions: Dict[str, str]) -> pd.DataFrame:
+    """Détection dédiée aux tensions sémantiques (dictionnaire simple)."""
+    return detecter_par_dico(texte, dico_tensions, "expression", "tension")
 
 # =========================
 # Négation (regex autour de "pouvoir")
@@ -921,6 +918,7 @@ try:
         DICO_CONSQS,
         DICO_CAUSES,
         DICO_MEMOIRES,
+        DICO_TENSIONS,
     ) = charger_dicos_conditions()
 except Exception as e:
     st.error("Impossible de charger les dictionnaires JSON à la racine.")
@@ -949,14 +947,6 @@ with st.sidebar:
     st.header("Méthodes d’analyse")
     use_regex_cc = st.checkbox("Causalité par Regex (dictionnaires JSON)", value=True)
     use_spacy_cc = st.checkbox("Causalité par spaCy (analyse NLP)", value=SPACY_OK)
-    use_tension_sem = st.checkbox(
-        "Tensions sémantiques (tension_semantique.json)",
-        value=False,
-        disabled=not TENSION_ANALYSE_OK,
-        help="Analyse contrastive fondée sur le fichier tension_semantique.json"
-    )
-    if not TENSION_ANALYSE_OK:
-        st.caption(f"Analyse des tensions indisponible : {TENSION_ANALYSE_ERR}")
 
 # Source du discours
 st.markdown("### Source du discours")
@@ -984,14 +974,7 @@ if texte_source.strip():
     df_memoires = detecter_memoires(texte_source, DICO_MEMOIRES)
     df_consq_lex = detecter_consequences_lex(texte_source, DICO_CONSQS) if use_regex_cc else pd.DataFrame()
     df_causes_lex = detecter_causes_lex(texte_source, DICO_CAUSES) if use_regex_cc else pd.DataFrame()
-    if use_tension_sem and TENSION_ANALYSE_OK and detect_tensions is not None:
-        try:
-            df_tensions = pd.DataFrame(detect_tensions(texte_source))
-        except Exception as err:
-            df_tensions = pd.DataFrame()
-            st.warning(f"Échec de l'analyse des tensions sémantiques : {err}")
-    else:
-        df_tensions = pd.DataFrame()
+    df_tensions = detecter_tensions_semantiques(texte_source, DICO_TENSIONS)
 else:
     df_conn = pd.DataFrame()
     df_marq = pd.DataFrame()
@@ -1048,22 +1031,19 @@ with ong2:
                            key="dl_occ_marq_csv")
 
     st.subheader("Tensions sémantiques détectées")
-    if not use_tension_sem:
-        st.info("Analyse des tensions désactivée (activez la case à cocher dans la barre latérale).")
-    elif not TENSION_ANALYSE_OK or detect_tensions is None:
-        st.warning("Analyse des tensions indisponible : consultez le message de la barre latérale.")
+    if not DICO_TENSIONS:
+        st.info("Aucun dictionnaire de tensions sémantiques chargé.")
+    elif df_tensions.empty:
+        st.info("Aucune tension sémantique détectée dans le texte.")
     else:
-        if df_tensions.empty:
-            st.info("Aucune tension sémantique détectée dans le texte.")
-        else:
-            st.dataframe(df_tensions, use_container_width=True, hide_index=True)
-            st.download_button(
-                "Exporter tensions sémantiques (CSV)",
-                data=df_tensions.to_csv(index=False).encode("utf-8"),
-                file_name="tensions_semantiques.csv",
-                mime="text/csv",
-                key="dl_occ_tensions_csv",
-            )
+        st.dataframe(df_tensions, use_container_width=True, hide_index=True)
+        st.download_button(
+            "Exporter tensions sémantiques (CSV)",
+            data=df_tensions.to_csv(index=False).encode("utf-8"),
+            file_name="tensions_semantiques.csv",
+            mime="text/csv",
+            key="dl_occ_tensions_csv",
+        )
 
     st.subheader("Marqueurs mémoire détectés")
     if df_memoires.empty:
