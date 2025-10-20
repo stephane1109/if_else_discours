@@ -48,24 +48,16 @@ NLP = None
 SPACY_STATUS: List[str] = []
 try:
     import spacy
-    from spacy.cli import download as spacy_download
 
     def _charger_modele_spacy(nom_modele: str) -> Any:
-        """Tente de charger (et télécharger au besoin) un modèle spaCy FR."""
+        """Tente de charger un modèle spaCy FR sans téléchargement automatique."""
         try:
             return spacy.load(nom_modele)
-        except OSError as err:
-            # Modèle non installé → tentative de téléchargement automatique
-            try:
-                spacy_download(nom_modele)
-                return spacy.load(nom_modele)
-            except Exception as dl_err:
-                SPACY_STATUS.append(
-                    f"Téléchargement du modèle spaCy '{nom_modele}' impossible : {dl_err}"
-                )
-                SPACY_STATUS.append(
-                    f"Erreur initiale lors du chargement de '{nom_modele}' : {err}"
-                )
+        except OSError:
+            SPACY_STATUS.append(
+                f"Modèle spaCy '{nom_modele}' absent. Installez-le manuellement"
+                f" (ex.: python -m spacy download {nom_modele}) pour activer l'analyse NLP."
+            )
         except Exception as err:
             SPACY_STATUS.append(
                 f"Chargement du modèle spaCy '{nom_modele}' impossible : {err}"
