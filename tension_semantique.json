@@ -63,16 +63,6 @@
   "gouvernement de mission": "TENS_OBJECTIFS_VS_CONCERTATION",
   "il n'agira qu'avec l'Assemblée nationale et le Sénat": "TENS_OBJECTIFS_VS_CONCERTATION",
 
-  "à la fois": "TENS_CONNECTEUR_CONTRASTE",
-  "en même temps": "TENS_CONNECTEUR_CONTRASTE",
-  "mais": "TENS_CONNECTEUR_CONTRASTE",
-  "cependant": "TENS_CONNECTEUR_CONTRASTE",
-  "pourtant": "TENS_CONNECTEUR_CONTRASTE",
-  "toutefois": "TENS_CONNECTEUR_CONTRASTE",
-  "y compris": "TENS_CONNECTEUR_CONTRASTE",
-  "tout en": "TENS_CONNECTEUR_CONTRASTE",
-  "au fond": "TENS_CONNECTEUR_CONTRASTE",
-
   "c'est une rupture": "TENS_DECLARATION_RUPTURE",
   "presque une révolution": "TENS_DECLARATION_RUPTURE",
   "changer de méthode": "TENS_DECLARATION_RUPTURE",
