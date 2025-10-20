@@ -49,11 +49,6 @@
   "la loi se fera ici": "TENS_SANS_493_VS_ABOUTIR",
   "il faudra des compromis": "TENS_SANS_493_VS_ABOUTIR",
 
-  "le travail paie": "TENS_MERITE_VS_REDIS",
-  "mérite, reconnaissance et récompense": "TENS_MERITE_VS_REDIS",
-  "justice fiscale": "TENS_MERITE_VS_REDIS",
-  "consentement à l'impôt": "TENS_MERITE_VS_REDIS",
-
   "impératif de souveraineté": "TENS_SOUVERAINETE_VS_MARCHES",
   "prêteurs étrangers": "TENS_SOUVERAINETE_VS_MARCHES",
 
@@ -67,12 +62,6 @@
   "presque une révolution": "TENS_DECLARATION_RUPTURE",
   "changer de méthode": "TENS_DECLARATION_RUPTURE",
 
-  "ne pas attendre": "TENS_RAPIDITE_VS_QUALIFICATION",
-  "ne jamais refuser la technicité": "TENS_RAPIDITE_VS_QUALIFICATION",
-
   "stabilité politique": "TENS_STABILITE_VS_TRANSFORMATION",
-  "réformes utiles": "TENS_STABILITE_VS_TRANSFORMATION",
-
-  "un seul responsable par politique publique": "TENS_SIMPLIFICATION_VS_COMPLEXITE",
-  "planification écologique et énergétique": "TENS_SIMPLIFICATION_VS_COMPLEXITE"
+  "réformes utiles": "TENS_STABILITE_VS_TRANSFORMATION"
 }
