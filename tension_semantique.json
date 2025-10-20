@@ -1,0 +1,88 @@
+{
+  "des libertés, y compris normatives": "TENS_LIBERTE_VS_NORME",
+  "libertés normatives": "TENS_LIBERTE_VS_NORME",
+  "mieux vaut montrer une France Unie qu'une France divisée": "TENS_UNITE_VS_DIVISION",
+  "France Unie": "TENS_UNITE_VS_DIVISION",
+  "France divisée": "TENS_UNITE_VS_DIVISION",
+
+  "voici incontestablement une rupture": "TENS_RUPTURE_VS_CONTINUITE",
+  "assurer la continuité de l'action de l'État": "TENS_RUPTURE_VS_CONTINUITE",
+  "continuité de l'action de l'État": "TENS_RUPTURE_VS_CONTINUITE",
+
+  "il y a urgence": "TENS_URGENCE_VS_TEMPS",
+  "ne pas attendre": "TENS_URGENCE_VS_TEMPS",
+  "jusqu'au vote": "TENS_URGENCE_VS_TEMPS",
+  "discussions budgétaires": "TENS_URGENCE_VS_TEMPS",
+  "travail technique préalable": "TENS_URGENCE_VS_TEMPS",
+
+  "partager le pouvoir": "TENS_DELIBERATION_VS_EFFICACITE",
+  "ouverture au débat et au compromis": "TENS_DELIBERATION_VS_EFFICACITE",
+  "donner un budget sérieux et fiable dans les trois mois": "TENS_DELIBERATION_VS_EFFICACITE",
+
+  "cette Assemblée n'a jamais été aussi représentative des Français": "TENS_REPRESENTATIVITE_VS_GOUVERNABILITE",
+  "Assemblée nationale divisée": "TENS_REPRESENTATIVITE_VS_GOUVERNABILITE",
+
+  "suspension de la réforme": "TENS_GESTE_APAISEMENT_VS_RIGUEUR",
+  "je n'endosserai pas n'importe quoi": "TENS_GESTE_APAISEMENT_VS_RIGUEUR",
+  "crédibilité de notre pays": "TENS_GESTE_APAISEMENT_VS_RIGUEUR",
+  "compensée financièrement": "TENS_GESTE_APAISEMENT_VS_RIGUEUR",
+
+  "baisses d'impôts pour les petites et moyennes entreprises": "TENS_BAISSE_VS_HAUSSE_IMPOTS",
+  "hausses d'impôts ciblés et exceptionnels": "TENS_BAISSE_VS_HAUSSE_IMPOTS",
+
+  "l'État s'est renforcé": "TENS_CENTRALISATION_VS_DECENTRALISATION",
+  "renforcer le pouvoir local": "TENS_CENTRALISATION_VS_DECENTRALISATION",
+  "décentraliser des responsabilités": "TENS_CENTRALISATION_VS_DECENTRALISATION",
+
+  "innover": "TENS_CHANGEMENT_VS_STABILITE",
+  "assumer des ruptures": "TENS_CHANGEMENT_VS_STABILITE",
+  "stabilité": "TENS_CHANGEMENT_VS_STABILITE",
+
+  "tirer les bienfaits d'une crise": "TENS_CRISE_VS_OPPORTUNITE",
+  "nous vivons dans une époque de crise": "TENS_CRISE_VS_OPPORTUNITE",
+
+  "ouverture au débat": "TENS_OUVERTURE_VS_LIGNES_ROUGES",
+  "compromis": "TENS_OUVERTURE_VS_LIGNES_ROUGES",
+  "lignes rouges": "TENS_OUVERTURE_VS_LIGNES_ROUGES",
+
+  "j'ai renoncé à utiliser l'article 49": "TENS_SANS_493_VS_ABOUTIR",
+  "la loi se fera ici": "TENS_SANS_493_VS_ABOUTIR",
+  "il faudra des compromis": "TENS_SANS_493_VS_ABOUTIR",
+
+  "le travail paie": "TENS_MERITE_VS_REDIS",
+  "mérite, reconnaissance et récompense": "TENS_MERITE_VS_REDIS",
+  "justice fiscale": "TENS_MERITE_VS_REDIS",
+  "consentement à l'impôt": "TENS_MERITE_VS_REDIS",
+
+  "impératif de souveraineté": "TENS_SOUVERAINETE_VS_MARCHES",
+  "prêteurs étrangers": "TENS_SOUVERAINETE_VS_MARCHES",
+
+  "notamment budgétaire, mais pas seulement": "TENS_ELARGIR_VS_FOCALISER",
+  "budget au coeur du débat": "TENS_ELARGIR_VS_FOCALISER",
+
+  "gouvernement de mission": "TENS_OBJECTIFS_VS_CONCERTATION",
+  "il n'agira qu'avec l'Assemblée nationale et le Sénat": "TENS_OBJECTIFS_VS_CONCERTATION",
+
+  "à la fois": "TENS_CONNECTEUR_CONTRASTE",
+  "en même temps": "TENS_CONNECTEUR_CONTRASTE",
+  "mais": "TENS_CONNECTEUR_CONTRASTE",
+  "cependant": "TENS_CONNECTEUR_CONTRASTE",
+  "pourtant": "TENS_CONNECTEUR_CONTRASTE",
+  "toutefois": "TENS_CONNECTEUR_CONTRASTE",
+  "y compris": "TENS_CONNECTEUR_CONTRASTE",
+  "tout en": "TENS_CONNECTEUR_CONTRASTE",
+  "au fond": "TENS_CONNECTEUR_CONTRASTE",
+
+  "c'est une rupture": "TENS_DECLARATION_RUPTURE",
+  "presque une révolution": "TENS_DECLARATION_RUPTURE",
+  "changer de méthode": "TENS_DECLARATION_RUPTURE",
+
+  "ne pas attendre": "TENS_RAPIDITE_VS_QUALIFICATION",
+  "ne jamais refuser la technicité": "TENS_RAPIDITE_VS_QUALIFICATION",
+
+  "stabilité politique": "TENS_STABILITE_VS_TRANSFORMATION",
+  "réformes utiles": "TENS_STABILITE_VS_TRANSFORMATION",
+
+  "un seul responsable par politique publique": "TENS_SIMPLIFICATION_VS_COMPLEXITE",
+  "planification écologique et énergétique": "TENS_SIMPLIFICATION_VS_COMPLEXITE"
+}
