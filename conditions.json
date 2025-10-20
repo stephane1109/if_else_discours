@@ -20,5 +20,21 @@
   "dans le cas ou": "CONDITION",
   "au cas où": "CONDITION",
   "au cas ou": "CONDITION",
-  "sous certaines conditions": "CONDITION"
+  "sous certaines conditions": "CONDITION",
+  "alors": "APODOSE",
+  "donc": "APODOSE",
+  "dès lors": "APODOSE",
+  "des lors": "APODOSE",
+  "par conséquent": "APODOSE",
+  "par consequent": "APODOSE",
+  "en conséquence": "APODOSE",
+  "en consequence": "APODOSE",
+  "de ce fait": "APODOSE",
+  "ainsi": "APODOSE",
+  "dans ce cas": "APODOSE",
+  "en ce cas": "APODOSE",
+  "auquel cas": "APODOSE",
+  "de sorte que": "APODOSE",
+  "de façon que": "APODOSE",
+  "de facon que": "APODOSE"
 }
