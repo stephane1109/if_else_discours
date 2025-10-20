@@ -134,6 +134,10 @@ COULEURS_MARQUEURS: Dict[str, Dict[str, str]] = {
     "MEM_REPET": {"bg": "#ede7f6", "fg": "#5e35b1", "bd": "#5e35b1"},
     "MEM_PASSE": {"bg": "#efebe9", "fg": "#6d4c41", "bd": "#6d4c41"},
 }
+
+COULEURS_TENSIONS: Dict[str, Dict[str, str]] = {
+    "DEFAULT": {"bg": "#fef3ff", "fg": "#7b1fa2", "bd": "#7b1fa2"},
+}
 FAMILLES_MARQUEURS_STANDARD = {
     "OBLIGATION", "INTERDICTION", "PERMISSION", "RECOMMANDATION", "SANCTION", "CADRE_OUVERTURE", "CADRE_FERMETURE"
 }
@@ -444,14 +448,18 @@ def css_badges() -> str:
         ".texte-annote { line-height: 1.8; font-size: 1.05rem; white-space: pre-wrap; }",
         ".badge-code { display: inline-block; padding: 0.05rem 0.4rem; margin-left: 0.25rem; border: 1px solid #333; border-radius: 0.35rem; font-family: monospace; font-size: 0.85em; vertical-align: baseline; }",
         ".badge-marqueur { display: inline-block; padding: 0.03rem 0.35rem; margin-left: 0.2rem; border: 1px dashed #333; border-radius: 0.35rem; font-family: monospace; font-size: 0.78em; vertical-align: baseline; }",
+        ".badge-tension { display: inline-block; padding: 0.03rem 0.35rem; margin-left: 0.2rem; border: 1px dashed #333; border-radius: 0.35rem; font-family: monospace; font-size: 0.78em; vertical-align: baseline; background-color: #fef3ff; color: #7b1fa2; border-color: #7b1fa2; }",
         ".connecteur { font-weight: 600; color: #c00000; }",
         ".mot-marque { font-weight: 600; text-decoration: underline; }",
+        ".mot-tension { font-weight: 600; text-decoration: underline dotted; }",
         "</style>",
     ]
     for code, pal in COULEURS_BADGES.items():
         lignes.insert(-1, f".badge-code.code-{code} {{ background-color: {pal['bg']}; color: {pal['fg']}; border-color: {pal['bd']}; }}")
     for cat, pal in COULEURS_MARQUEURS.items():
         lignes.insert(-1, f".badge-marqueur.marq-{_esc(cat)} {{ background-color: {pal['bg']}; color: {pal['fg']}; border-color: {pal['bd']}; }}")
+    for cat, pal in COULEURS_TENSIONS.items():
+        lignes.insert(-1, f".badge-tension.tension-{_esc(cat)} {{ background-color: {pal['bg']}; color: {pal['fg']}; border-color: {pal['bd']}; }}")
     return "\n".join(lignes)
 
 def occurrences_mixte(texte: str,
@@ -459,7 +467,8 @@ def occurrences_mixte(texte: str,
                       dico_marq: Dict[str, str],
                       dico_memoires: Dict[str, str],
                       dico_consq: Dict[str, str],
-                      dico_causes: Dict[str, str]) -> List[Dict[str, Any]]:
+                      dico_causes: Dict[str, str],
+                      dico_tensions: Dict[str, str]) -> List[Dict[str, Any]]:
     """Fusionne toutes les occurrences, élimine les chevauchements (priorité au plus long)."""
     occs: List[Dict[str, Any]] = []
     for typ, dico in [
@@ -468,6 +477,7 @@ def occurrences_mixte(texte: str,
         ("memoire", dico_memoires),
         ("consequence", dico_consq),
         ("cause", dico_causes),
+        ("tension", dico_tensions),
     ]:
         if not dico:
             continue
@@ -494,11 +504,14 @@ def html_annote(texte: str,
                 dico_memoires: Dict[str, str],
                 dico_consq: Dict[str, str],
                 dico_causes: Dict[str, str],
+                dico_tensions: Dict[str, str],
                 show_codes: Dict[str, bool],
                 show_consequences: bool,
                 show_causes: bool,
+                show_tensions: bool,
                 show_marqueurs_categories: Dict[str, bool] = None,
-                show_memoires_categories: Dict[str, bool] = None) -> str:
+                show_memoires_categories: Dict[str, bool] = None,
+                show_tensions_categories: Dict[str, bool] = None) -> str:
     """Produit le HTML annoté selon les cases cochées."""
     if not texte:
         return "<div class='texte-annote'>(Texte vide)</div>"
@@ -512,9 +525,14 @@ def html_annote(texte: str,
             str(cat).upper(): bool(val)
             for cat, val in show_memoires_categories.items()
         }
+    if show_tensions_categories is not None:
+        show_tensions_categories = {
+            str(cat).upper(): bool(val)
+            for cat, val in show_tensions_categories.items()
+        }
 
     t = texte
-    occ = occurrences_mixte(t, dico_conn, dico_marq, dico_memoires, dico_consq, dico_causes)
+    occ = occurrences_mixte(t, dico_conn, dico_marq, dico_memoires, dico_consq, dico_causes, dico_tensions)
     morceaux: List[str] = []; curseur = 0
     for m in occ:
         # Filtres d’affichage
@@ -536,6 +554,12 @@ def html_annote(texte: str,
         elif m["type"] == "cause":
             if not show_causes:
                 continue
+        elif m["type"] == "tension":
+            if not show_tensions:
+                continue
+            cat = str(m["etiquette"]).upper()
+            if show_tensions_categories is not None and not show_tensions_categories.get(cat, True):
+                continue
 
         if m["debut"] > curseur:
             morceaux.append(_esc(t[curseur:m["debut"]]))
@@ -545,6 +569,11 @@ def html_annote(texte: str,
             code = str(m["etiquette"]).upper()
             badge = f"<span class='badge-code code-{_esc(code)}'>{_esc(libelle_python(code))}</span>"
             rendu = f"<span class='connecteur'>{mot_original}</span>{badge}"
+        elif m["type"] == "tension":
+            cat_disp = str(m["etiquette"]).upper()
+            css_suffix = cat_disp if cat_disp in COULEURS_TENSIONS else "DEFAULT"
+            badge = f"<span class='badge-tension tension-{_esc(css_suffix)}'>{_esc(cat_disp)}</span>"
+            rendu = f"<span class='mot-tension'>{mot_original}</span>{badge}"
         else:
             cat_disp = str(m["etiquette"]).upper()
             badge = f"<span class='badge-marqueur marq-{_esc(cat_disp)}'>{_esc(cat_disp)}</span>"
@@ -1123,6 +1152,23 @@ with ong2:
     else:
         show_memoires_categories = None
 
+    categories_tensions = sorted({str(v).upper() for v in DICO_TENSIONS.values()})
+    show_tensions_categories: Dict[str, bool] = {}
+    if categories_tensions:
+        st.markdown("**Tensions sémantiques**")
+        show_tensions = st.checkbox("Afficher les tensions sémantiques", value=True, key="chk_tensions_global")
+        for cat in categories_tensions:
+            label = cat.replace("_", " ")
+            sanitized_key = re.sub(r"[^0-9a-z]+", "_", cat.lower())
+            show_tensions_categories[cat] = st.checkbox(
+                label,
+                value=True,
+                key=f"chk_tension_{sanitized_key}"
+            )
+    else:
+        show_tensions = False
+        show_tensions_categories = None
+
     st.markdown("**Marqueurs de causalité**")
     show_consequences = st.checkbox("CONSEQUENCE", value=True, key="chk_consequence")
     show_causes = st.checkbox("CAUSE", value=True, key="chk_cause")
@@ -1139,11 +1185,14 @@ with ong2:
             DICO_MEMOIRES,
             DICO_CONSQS if show_consequences else {},
             DICO_CAUSES if show_causes else {},
+            DICO_TENSIONS if show_tensions else {},
             show_codes=show_codes,
             show_marqueurs_categories=show_marqueurs_categories,
             show_memoires_categories=show_memoires_categories,
+            show_tensions_categories=show_tensions_categories,
             show_consequences=show_consequences,
-            show_causes=show_causes
+            show_causes=show_causes,
+            show_tensions=show_tensions
         )
         st.markdown(frag, unsafe_allow_html=True)
         st.download_button("Exporter le texte annoté (HTML)",
