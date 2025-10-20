@@ -152,9 +152,8 @@ def graphique_altair_chronologie(
                 alt.Tooltip("t_rel:Q", title="Progression (%)", format=".2f"),
                 alt.Tooltip("id_phrase:Q", title="Phrase #"),
                 alt.Tooltip("surface:N", title="Surface"),
-                alt.Tooltip("etiquette:N", title="Famille/Cat."),
+                alt.Tooltip("etiquette:N", title="Typologie"),
                 alt.Tooltip("type:N", title="Type"),
-                alt.Tooltip("phrase:N", title="Phrase"),
             ],
         )
         .properties(height=320)
@@ -166,19 +165,19 @@ def graphique_altair_chronologie(
 def graphique_barres_marqueurs_temps(
     df_temps_marqueurs: pd.DataFrame,
 ):
-    """Construit un graphique des occurrences par marqueur dans le discours."""
+    """Construit un graphique des occurrences par typologie de marqueur."""
 
     if df_temps_marqueurs is None or df_temps_marqueurs.empty:
         return None
 
-    colonnes_requises = {"surface", "etiquette"}
+    colonnes_requises = {"etiquette"}
     if not colonnes_requises.issubset(df_temps_marqueurs.columns):
         return None
 
     df_freq = (
         df_temps_marqueurs
-        .assign(surface=lambda d: d["surface"].astype(str))
-        .groupby(["surface", "etiquette"], dropna=False)
+        .assign(etiquette=lambda d: d["etiquette"].astype(str))
+        .groupby(["etiquette"], dropna=False)
         .size()
         .reset_index(name="occurrences")
     )
@@ -186,18 +185,17 @@ def graphique_barres_marqueurs_temps(
     if df_freq.empty:
         return None
 
-    df_freq.sort_values(by=["occurrences", "surface"], ascending=[False, True], inplace=True)
+    df_freq.sort_values(by=["occurrences", "etiquette"], ascending=[False, True], inplace=True)
 
     chart = (
         alt.Chart(df_freq)
         .mark_bar()
         .encode(
             x=alt.X("occurrences:Q", title="Occurrences dans le discours"),
-            y=alt.Y("surface:N", title="Marqueur", sort="-x"),
-            color=alt.Color("etiquette:N", title="Famille / Catégorie"),
+            y=alt.Y("etiquette:N", title="Typologie", sort="-x"),
+            color=alt.Color("etiquette:N", title="Typologie"),
             tooltip=[
-                alt.Tooltip("surface:N", title="Marqueur"),
-                alt.Tooltip("etiquette:N", title="Famille / Catégorie"),
+                alt.Tooltip("etiquette:N", title="Typologie"),
                 alt.Tooltip("occurrences:Q", title="Occurrences"),
             ],
         )
