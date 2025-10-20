@@ -1146,53 +1146,48 @@ with ong3:
 with ong4:
     st.subheader("Guide d’interprétation : Python vs analyse de discours")
 
-    st.markdown("#### CONDITION (SI)")
-    st.write(
-        "Cadre Python : `if` introduit une condition booléenne ; le bloc indenté s’exécute si la condition est vraie. "
-        "On peut enchaîner `elif` puis `else` ; la condition évalue `True/False` (valeurs truthy/falsy admises).\n\n"
-        "Cadre analyse : « si », « à condition que », « pourvu que », « au cas où » posent une condition d’acceptabilité ou de mise en œuvre."
+    st.markdown("#### Connecteurs \"logiques\" (façon Python)")
+    st.markdown(
+        "- **IF (si…)** : introduit une condition ; ce qui suit dépend du fait que la condition soit vraie.\n"
+        "- **ELSE (sinon)** : propose l’alternative quand la condition précédente n’est pas remplie.\n"
+        "- **WHILE (tant que)** : action répétée tant qu’une condition reste vraie, marque une persistance.\n"
+        "- **AND (et)** : additionne ou exige plusieurs conditions/éléments à la fois.\n"
+        "- **OR (ou/soit)** : offre des alternatives ; au moins une suffit."
     )
 
-    st.markdown("#### ALORS")
-    st.write(
-        "Cadre Python : la partie `then` n’existe pas explicitement mais correspond au bloc exécuté lorsque la condition est vraie.\n\n"
-        "Cadre analyse : « alors », « dès lors », « par conséquent », « ainsi » introduisent l’apodose, c’est-à-dire le résultat attendu si la condition est satisfaite."
+    st.markdown("#### Marqueurs normatifs (prescription)")
+    st.markdown(
+        "- **OBLIGATION** : ce qui doit être fait (nécessité, devoir).\n"
+        "- **INTERDICTION** : ce qui ne doit pas être fait (empêchement, prohibition).\n"
+        "- **PERMISSION** : ce qui est autorisé ou possible.\n"
+        "- **RECOMMANDATION** : ce qu’il vaut mieux faire (conseil, souhaitable).\n"
+        "- **SANCTION** : annonce une punition ou un coût en cas d’écart.\n"
+        "- **CADRE_OUVERTURE** : invite à débattre ou à élargir le dialogue.\n"
+        "- **CADRE_FERMETURE** : clôt ou restreint le débat (pas le moment, pas de polémique)."
     )
 
-    st.markdown("#### ALTERNATIVE (SINON)")
-    st.write(
-        "Cadre Python : `else` est la branche alternative quand la condition est fausse.\n\n"
-        "Cadre analyse : « sinon », « autrement », « à défaut » marquent l’alternative par défaut ou le coût si la condition n’est pas remplie."
+    st.markdown("#### Relations causales")
+    st.markdown(
+        "- **CAUSE** : justifie ou explique un fait (parce que, car, en raison de…).\n"
+        "- **CONSEQUENCE** : en déduit l’effet ou l’issue (donc, alors, par conséquent…)."
     )
 
-    st.markdown("#### WHILE (TANT QUE)")
-    st.write(
-        "Cadre Python : `while` répète un bloc tant que l’expression reste vraie ; `break` sort ; `continue` saute l’itération suivante.\n\n"
-        "Cadre analyse : « tant que » exprime une persistance conditionnelle (maintien d’une action tant qu’un état perdure)."
+    st.markdown("#### Marqueurs \"mémoire\" (cognitifs)")
+    st.markdown(
+        "- **MEM_SELF** : référence à soi ou à son vécu pour asseoir la crédibilité.\n"
+        "- **MEM_GROUP** : mémoire partagée d’un groupe (« nous », collectif).\n"
+        "- **MEM_NATION** : récit ou imaginaire national, héritage commun.\n"
+        "- **MEM_HIST** : rappel d’événements ou de figures historiques.\n"
+        "- **MEM_VAL** : évocation de valeurs ou d’idéaux fondateurs (justice, dignité…).\n"
+        "- **MEM_FEAR** : souvenirs anxiogènes, menaces ou mises en garde.\n"
+        "- **MEM_HOPE** : souvenirs porteurs d’espoir, horizon positif.\n"
+        "- **MEM_RITUAL** : formules rituelles (remerciements, hommages, solennité)."
     )
 
-    st.markdown("#### AND (ET)")
-    st.write(
-        "Cadre Python : `and` exige que toutes les sous-conditions soient vraies (court-circuit logique).\n\n"
-        "Cadre analyse : « et », « ainsi que » agrègent des critères/engagements pour construire un front commun."
-    )
-
-    st.markdown("#### OR (OU)")
-    st.write(
-        "Cadre Python : `or` vaut vrai si au moins une sous-condition est vraie (court-circuit).\n\n"
-        "Cadre analyse : « ou », « ou bien », « soit » posent des alternatives."
-    )
-
-    st.markdown("#### Déclencheurs de conséquence (CONSEQUENCE)")
-    st.write(
-        "Repères pour l’apodose : « donc », « alors », « c’est pourquoi », "
-        "« par conséquent », « de ce fait », « ainsi », « dès lors », « en conséquence », etc."
-    )
-
-    st.markdown("#### Déclencheurs de cause (CAUSE)")
-    st.write(
-        "Repères qui motivent/justifient un fait : « parce que », « car », « puisque », « comme » (en tête), "
-        "« en raison de », « du fait que », « à cause de », « grâce à », « faute de », « suite à », etc."
+    st.markdown("#### Marqueurs \"si… alors / sinon\"")
+    st.markdown(
+        "- **CONDITION** : déclenche la condition (« si… », « à condition que… »).\n"
+        "- **APODOSE / ALORS** : pointe la conséquence attendue (« alors », « donc », « dès lors… »)."
     )
 
 # Onglet 5 : CONDITIONS LOGIQUES – SI/ALORS
