@@ -11,11 +11,13 @@
   "la mémoire collective": "MEM_COLL",
 
   "rappelons que": "MEM_RAPPEL",
+  "rappelez vous": "MEM_RAPPEL",
   "je rappelle que": "MEM_RAPPEL",
   "nous rappelons que": "MEM_RAPPEL",
   "il ne faut pas oublier": "MEM_RAPPEL",
   "il ne faut rien oublier": "MEM_RAPPEL",
   "n'oublions pas": "MEM_RAPPEL",
+  "n'oubliez pas": "MEM_RAPPEL",
   "qu’on se le rappelle": "MEM_RAPPEL",
 
   "comme je l'ai déjà dit": "MEM_RENVOI",
