@@ -190,14 +190,14 @@ def graphique_altair_chronologie(
                 title="Progression du discours (%)",
                 scale=alt.Scale(domain=[0, 100]),
             ),
-            y=alt.Y("etiquette:N", title="Famille / Catégorie"),
+            y=alt.Y("etiquette:N", title="marqueurs"),
             color=alt.Color("type:N", title="Type", legend=alt.Legend(title="Type")),
             size=alt.Size("longueur:Q", title="Longueur repérée", legend=None),
             tooltip=[
                 alt.Tooltip("t_rel:Q", title="Progression (%)", format=".2f"),
                 alt.Tooltip("id_phrase:Q", title="Phrase #"),
                 alt.Tooltip("surface:N", title="Surface"),
-                alt.Tooltip("etiquette:N", title="Typologie"),
+                alt.Tooltip("etiquette:N", title="Marqueur"),
                 alt.Tooltip("type:N", title="Type"),
             ],
         )
@@ -237,10 +237,10 @@ def graphique_barres_marqueurs_temps(
         .mark_bar()
         .encode(
             x=alt.X("occurrences:Q", title="Occurrences dans le discours"),
-            y=alt.Y("etiquette:N", title="Typologie", sort="-x"),
+            y=alt.Y("etiquette:N", title="marqueurs", sort="-x"),
             color=alt.Color("etiquette:N", title="Typologie"),
             tooltip=[
-                alt.Tooltip("etiquette:N", title="Typologie"),
+                alt.Tooltip("etiquette:N", title="Marqueur"),
                 alt.Tooltip("occurrences:Q", title="Occurrences"),
             ],
         )
@@ -324,7 +324,7 @@ def render_stats_tab(
         if repartition_parts:
             st.caption("Répartition — " + " ; ".join(repartition_parts))
 
-        st.markdown("### Fréquence des marqueurs et tensions dans le discours")
+        st.markdown("### Fréquence des marqueurs")
         df_temps_marqueurs = (
             df_temps[
                 df_temps["type"].isin(
