@@ -24,18 +24,12 @@
   "qu’on se le rappelle": "MEM_RAPPEL",
 
   "comme je l'ai déjà dit": "MEM_RENVOI",
-  "comme je l’ai déjà dit": "MEM_RENVOI",
   "comme je l'ai déjà annoncé": "MEM_RENVOI",
-  "comme je l’ai déjà annoncé": "MEM_RENVOI",
   "comme je l'ai indiqué": "MEM_RENVOI",
-  "comme je l’ai indiqué": "MEM_RENVOI",
   "je l'ai déjà dit": "MEM_RENVOI",
-  "je l’ai déjà dit": "MEM_RENVOI",
   "je l'ai déjà annoncé": "MEM_RENVOI",
-  "je l’ai déjà annoncé": "MEM_RENVOI",
   "je me suis engagé à": "MEM_RENVOI",
   "je l'avais dit": "MEM_RENVOI",
-  "je l’avais dit": "MEM_RENVOI",
 
   "déjà": "MEM_REPET",
   "encore": "MEM_REPET",
