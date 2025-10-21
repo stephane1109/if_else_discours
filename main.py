@@ -1018,7 +1018,7 @@ ong1, ong2, ong3, ong4, ong5, ong6, ong_stats = st.tabs([
     "Détections",
     "Dictionnaires (JSON)",
     "Guide d’interprétation",
-    "CONDITIONS LOGIQUES – SI/ALORS",
+    "conditions logiques : si/alors",
     "Comparatif Regex / spaCy",
     "Stats",
 ])
@@ -1259,7 +1259,7 @@ with ong4:
         "- **APODOSE / ALORS** : pointe la conséquence attendue (« alors », « donc », « dès lors… »)."
     )
 
-# Onglet 5 : CONDITIONS LOGIQUES – SI/ALORS
+# Onglet 5 : conditions logiques : si/alors
 with ong5:
     st.subheader("Segments conditionnels détectés (SI / ALORS / SINON / TANT QUE)")
     if not texte_source.strip():
