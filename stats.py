@@ -135,9 +135,34 @@ def construire_df_temps(
         "longueur",
         "phrase",
     ]
+
+    valeurs_par_defaut = {
+        "t_rel": 0.0,
+        "id_phrase": 0,
+        "surface": "",
+        "etiquette": "",
+        "type": "",
+        "position": 0,
+        "longueur": 0,
+        "phrase": "",
+    }
+
     for col in cols:
         if col not in df.columns:
-            df[col] = ""
+            df[col] = valeurs_par_defaut[col]
+
+    # Homogénéise les types pour éviter des erreurs Altair/Streamlit
+    df["t_rel"] = pd.to_numeric(df["t_rel"], errors="coerce").fillna(0.0)
+    df["position"] = pd.to_numeric(df["position"], errors="coerce").fillna(0).astype(int)
+    df["longueur"] = pd.to_numeric(df["longueur"], errors="coerce").fillna(0).astype(int)
+    df["id_phrase"] = (
+        pd.to_numeric(df["id_phrase"], errors="coerce").fillna(0).astype(int)
+    )
+    df["surface"] = df["surface"].astype(str)
+    df["etiquette"] = df["etiquette"].astype(str)
+    df["type"] = df["type"].astype(str)
+    df["phrase"] = df["phrase"].astype(str)
+
     return df[cols]
 
 
