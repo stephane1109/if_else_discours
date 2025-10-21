@@ -1153,21 +1153,16 @@ with ong2:
         show_memoires_categories = None
 
     categories_tensions = sorted({str(v).upper() for v in DICO_TENSIONS.values()})
-    show_tensions_categories: Dict[str, bool] = {}
+    show_tensions_categories: Optional[Dict[str, bool]] = None
     if categories_tensions:
         st.markdown("**Tensions sémantiques**")
-        show_tensions = st.checkbox("Afficher les tensions sémantiques", value=True, key="chk_tensions_global")
-        for cat in categories_tensions:
-            label = cat.replace("_", " ")
-            sanitized_key = re.sub(r"[^0-9a-z]+", "_", cat.lower())
-            show_tensions_categories[cat] = st.checkbox(
-                label,
-                value=True,
-                key=f"chk_tension_{sanitized_key}"
-            )
+        show_tensions = st.checkbox(
+            "Afficher les tensions sémantiques",
+            value=True,
+            key="chk_tensions_global",
+        )
     else:
         show_tensions = False
-        show_tensions_categories = None
 
     st.markdown("**Marqueurs de causalité**")
     show_consequences = st.checkbox("CONSEQUENCE", value=True, key="chk_consequence")
