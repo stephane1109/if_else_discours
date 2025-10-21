@@ -1403,4 +1403,5 @@ with ong_stats:
         df_memoires,
         df_consq_lex,
         df_causes_lex,
+        df_tensions,
     )

@@ -67,12 +67,20 @@ def construire_df_temps(
     df_memoires: pd.DataFrame,
     df_consq_lex: pd.DataFrame,
     df_causes_lex: pd.DataFrame,
+    df_tensions: pd.DataFrame,
 ) -> pd.DataFrame:
     """Fusionne tous les jeux en un seul tableau temporel avec colonnes normalisées pour Altair."""
     if not texte_source or not texte_source.strip():
         return pd.DataFrame()
 
     phrases, offsets, total_len = _positions_phrases(texte_source)
+
+    df_conn = df_conn if df_conn is not None else pd.DataFrame()
+    df_marq = df_marq if df_marq is not None else pd.DataFrame()
+    df_memoires = df_memoires if df_memoires is not None else pd.DataFrame()
+    df_consq_lex = df_consq_lex if df_consq_lex is not None else pd.DataFrame()
+    df_causes_lex = df_causes_lex if df_causes_lex is not None else pd.DataFrame()
+    df_tensions = df_tensions if df_tensions is not None else pd.DataFrame()
 
     a = df_conn.copy()
     if not a.empty:
@@ -103,8 +111,13 @@ def construire_df_temps(
         d["type"] = "CAUSE"
         d.rename(columns={"cause": "surface", "categorie": "etiquette"}, inplace=True)
         d = _ajoute_colonne_t_rel(d, phrases, offsets, total_len)
+    t = df_tensions.copy()
+    if not t.empty:
+        t["type"] = "TENSION SÉMANTIQUE"
+        t.rename(columns={"expression": "surface", "tension": "etiquette"}, inplace=True)
+        t = _ajoute_colonne_t_rel(t, phrases, offsets, total_len)
 
-    frames = [x for x in [a, b, m, c, d] if x is not None and not x.empty]
+    frames = [x for x in [a, b, m, c, d, t] if x is not None and not x.empty]
     if not frames:
         return pd.DataFrame()
 
@@ -218,9 +231,10 @@ def render_stats_tab(
     df_memoires: pd.DataFrame,
     df_consq_lex: pd.DataFrame,
     df_causes_lex: pd.DataFrame,
+    df_tensions: pd.DataFrame,
 ) -> None:
     """Affiche les statistiques des marqueurs dans l'onglet Streamlit dédié."""
-    st.subheader("Statistiques des marqueurs normatifs & mémoire")
+    st.subheader("Statistiques des marqueurs normatifs, mémoire & tensions sémantiques")
 
     df_temps = construire_df_temps(
         texte_source=texte_source,
@@ -229,6 +243,7 @@ def render_stats_tab(
         df_memoires=df_memoires,
         df_consq_lex=df_consq_lex,
         df_causes_lex=df_causes_lex,
+        df_tensions=df_tensions,
     )
 
     df_normatif = pd.DataFrame()
@@ -245,7 +260,14 @@ def render_stats_tab(
         df_memoire["surface"] = df_memoire["memoire"].astype(str)
         df_memoire["type_source"] = "MEMOIRE"
 
-    frames = [x for x in [df_normatif, df_memoire] if not x.empty]
+    df_tension = pd.DataFrame()
+    if df_tensions is not None and not df_tensions.empty:
+        df_tension = df_tensions.copy()
+        df_tension["categorie"] = df_tension["tension"].astype(str).str.upper()
+        df_tension["surface"] = df_tension["expression"].astype(str)
+        df_tension["type_source"] = "TENSION SÉMANTIQUE"
+
+    frames = [x for x in [df_normatif, df_memoire, df_tension] if not x.empty]
 
     if not frames:
         st.info("Aucun marqueur détecté pour générer des statistiques.")
@@ -272,12 +294,18 @@ def render_stats_tab(
             repartition_parts.append(f"normatifs : {len(df_normatif)}")
         if not df_memoire.empty:
             repartition_parts.append(f"mémoire : {len(df_memoire)}")
+        if not df_tension.empty:
+            repartition_parts.append(f"tensions : {len(df_tension)}")
         if repartition_parts:
             st.caption("Répartition — " + " ; ".join(repartition_parts))
 
-        st.markdown("### Fréquence des marqueurs dans le discours")
+        st.markdown("### Fréquence des marqueurs et tensions dans le discours")
         df_temps_marqueurs = (
-            df_temps[df_temps["type"].isin(["MARQUEUR", "MEMOIRE"])].copy()
+            df_temps[
+                df_temps["type"].isin(
+                    ["MARQUEUR", "MEMOIRE", "TENSION SÉMANTIQUE"]
+                )
+            ].copy()
             if df_temps is not None and not df_temps.empty
             else pd.DataFrame()
         )
