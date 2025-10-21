@@ -1,11 +1,8 @@
 {
   "je me souviens": "MEM_PERS",
   "je m'en souviens": "MEM_PERS",
-  "je m’en souviens": "MEM_PERS",
   "je n'ai pas oublié": "MEM_PERS",
-  "je n’ai pas oublié": "MEM_PERS",
   "je n'oublie pas": "MEM_PERS",
-  "je n’oublie pas": "MEM_PERS",
 
   "nous nous souvenons": "MEM_COLL",
   "souvenons-nous": "MEM_COLL",
@@ -19,8 +16,6 @@
   "il ne faut pas oublier": "MEM_RAPPEL",
   "il ne faut rien oublier": "MEM_RAPPEL",
   "n'oublions pas": "MEM_RAPPEL",
-  "n’oublions pas": "MEM_RAPPEL",
-  "qu'on se le rappelle": "MEM_RAPPEL",
   "qu’on se le rappelle": "MEM_RAPPEL",
 
   "comme je l'ai déjà dit": "MEM_RENVOI",
