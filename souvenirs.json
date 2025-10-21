@@ -7,11 +7,12 @@
   "nous nous souvenons": "MEM_COLL",
   "souvenons-nous": "MEM_COLL",
   "souvenez-vous": "MEM_COLL",
+  "rappelez vous": "MEM_COLL",
+  "rappelez-vous": "MEM_COLL",
   "la nation se souvient": "MEM_COLL",
   "la mémoire collective": "MEM_COLL",
 
   "rappelons que": "MEM_RAPPEL",
-  "rappelez vous": "MEM_RAPPEL",
   "je rappelle que": "MEM_RAPPEL",
   "nous rappelons que": "MEM_RAPPEL",
   "il ne faut pas oublier": "MEM_RAPPEL",
