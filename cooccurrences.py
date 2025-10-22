@@ -306,6 +306,29 @@ def _nuage_de_mots(df: pd.DataFrame, max_mots: int) -> alt.Chart | None:
     return chart
 
 
+def _filtrer_cooccurrences_par_mot_cle(df: pd.DataFrame, mot_cle: str) -> pd.DataFrame:
+    """Retourne les co-occurrences qui impliquent le mot-clé fourni."""
+
+    mot_cle_normalise = mot_cle.strip().lower()
+    if not mot_cle_normalise or df.empty:
+        return pd.DataFrame(columns=[*df.columns, "mot_cle", "mot_associe"])
+
+    masque_mot1 = df["mot1"].str.lower() == mot_cle_normalise
+    masque_mot2 = df["mot2"].str.lower() == mot_cle_normalise
+    masque = masque_mot1 | masque_mot2
+
+    df_filtre = df.loc[masque].copy()
+    if df_filtre.empty:
+        return df_filtre
+
+    df_filtre["mot_cle"] = mot_cle_normalise
+    df_filtre["mot_associe"] = [
+        ligne.mot2 if ligne.mot1.lower() == mot_cle_normalise else ligne.mot1
+        for ligne in df_filtre.itertuples(index=False)
+    ]
+    return df_filtre
+
+
 def render_cooccurrences_tab(texte_source: str) -> None:
     """Affiche l'onglet Streamlit consacré aux co-occurrences."""
     st.subheader("Analyse des co-occurrences")
@@ -382,6 +405,40 @@ def render_cooccurrences_tab(texte_source: str) -> None:
         st.info("Aucune co-occurrence ne correspond au seuil minimal sélectionné.")
         return
 
+    mot_cle_saisi = st.text_input(
+        "Mot-clé pour une analyse ciblée",
+        help=(
+            "Filtre les co-occurrences pour ne conserver que celles qui impliquent le mot"
+            " indiqué. Laissez vide pour conserver toutes les co-occurrences."
+        ),
+    )
+    mot_cle_analyse = mot_cle_saisi.strip()
+    df_mot_cle = pd.DataFrame()
+    if mot_cle_analyse:
+        df_mot_cle = _filtrer_cooccurrences_par_mot_cle(df_filtre, mot_cle_analyse)
+        if df_mot_cle.empty:
+            st.info(
+                "Aucune co-occurrence ne contient le mot-clé « "
+                f"{html.escape(mot_cle_analyse)} » avec les paramètres sélectionnés."
+            )
+        else:
+            st.markdown(
+                "### Co-occurrences associées à « "
+                f"{html.escape(mot_cle_analyse)} »"
+            )
+            st.dataframe(
+                df_mot_cle[["mot_associe", "pair", "occurrences"]]
+                .rename(columns={"mot_associe": "Mot associé"}),
+                use_container_width=True,
+                hide_index=True,
+            )
+            total_occurrences = int(df_mot_cle["occurrences"].sum())
+            nb_associes = int(df_mot_cle["mot_associe"].nunique())
+            st.caption(
+                f"Le mot-clé apparaît dans {nb_associes} co-occurrence(s) distincte(s) "
+                f"pour un total de {total_occurrences} occurrence(s)."
+            )
+
     if granularite_interne == "document":
         st.caption(
             "Les co-occurrences sont calculées à l'échelle du document : deux mots "
@@ -437,6 +494,11 @@ def render_cooccurrences_tab(texte_source: str) -> None:
         (str(ligne.mot1), str(ligne.mot2))
         for ligne in df_filtre.itertuples(index=False)
     ]
+    if mot_cle_analyse and not df_mot_cle.empty:
+        paires_filtrees = [
+            (str(ligne.mot1), str(ligne.mot2))
+            for ligne in df_mot_cle.itertuples(index=False)
+        ]
     paires_uniques = list(dict.fromkeys(paires_filtrees))
 
     cooccurrences_trouvees = False
