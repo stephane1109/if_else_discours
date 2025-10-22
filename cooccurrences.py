@@ -89,8 +89,14 @@ def _extraire_mots(
     *,
     longueur_min: int = 2,
     modele_spacy: Optional["Language"] = None,
+    filtrer_stopwords: bool = True,
 ) -> List[str]:
-    """Extrait des mots en minuscule, filtrés sur la longueur minimale."""
+    """Extrait des mots en minuscule, filtrés sur la longueur minimale.
+
+    Le paramètre ``filtrer_stopwords`` permet de contrôler la suppression des mots
+    outils lorsqu'un modèle spaCy est disponible ou, à défaut, via la liste de
+    stopwords fournie par ``spacy.lang.fr``.
+    """
     if not phrase:
         return []
 
@@ -105,7 +111,7 @@ def _extraire_mots(
                 continue
             if len(token.text) < longueur_min:
                 continue
-            if token.is_stop:
+            if filtrer_stopwords and token.is_stop:
                 continue
             lemme = token.lemma_.lower() if token.lemma_ else token.text.lower()
             tokens.append(lemme)
@@ -113,7 +119,10 @@ def _extraire_mots(
             return tokens
 
     mots = [m.lower() for m in _WORD_PATTERN.findall(phrase)]
-    stopwords = SPACY_STOP_WORDS if SPACY_STOP_WORDS else set()
+    if filtrer_stopwords:
+        stopwords = SPACY_STOP_WORDS if SPACY_STOP_WORDS else set()
+    else:
+        stopwords = set()
     return [m for m in mots if len(m) >= longueur_min and m not in stopwords]
 
 
@@ -175,6 +184,7 @@ def _generer_cooccurrences(
     longueur_min: int = 2,
     modele_spacy: Optional["Language"] = None,
     granularite: str = "phrase",
+    filtrer_stopwords: bool = True,
 ) -> Counter[str]:
     """Compte les co-occurrences selon la granularité demandée."""
 
@@ -185,6 +195,7 @@ def _generer_cooccurrences(
             texte,
             longueur_min=longueur_min,
             modele_spacy=modele_spacy,
+            filtrer_stopwords=filtrer_stopwords,
         )
         if len(tokens) < 2:
             return compteurs
@@ -204,6 +215,7 @@ def _generer_cooccurrences(
                     phrase,
                     longueur_min=longueur_min,
                     modele_spacy=modele_spacy,
+                    filtrer_stopwords=filtrer_stopwords,
                 )
             )
         )
@@ -220,6 +232,7 @@ def calculer_table_cooccurrences(
     *,
     longueur_min: int = 2,
     granularite: str = "phrase",
+    filtrer_stopwords: bool = True,
 ) -> pd.DataFrame:
     """Retourne un DataFrame des co-occurrences triées par fréquence décroissante."""
     modele_spacy = _charger_modele_spacy()
@@ -228,6 +241,7 @@ def calculer_table_cooccurrences(
         longueur_min=longueur_min,
         modele_spacy=modele_spacy,
         granularite=granularite,
+        filtrer_stopwords=filtrer_stopwords,
     )
     if not compteur:
         return pd.DataFrame(columns=["mot1", "mot2", "pair", "occurrences"])
@@ -350,21 +364,29 @@ def render_cooccurrences_tab(texte_source: str) -> None:
         "comme co-occurrents s'ils apparaissent dans la même phrase."
     )
 
+    filtrer_stopwords = st.checkbox(
+        "Filtrer les stopwords",
+        value=True,
+        help="Décochez pour conserver tous les mots, y compris les articles et prépositions.",
+    )
+
     modele_spacy = _charger_modele_spacy()
-    if modele_spacy is None:
+    if filtrer_stopwords and modele_spacy is None:
         if spacy is None:
             st.warning(
-                "spaCy n'est pas disponible. Les stopwords ne seront pas filtrés."
+                "spaCy n'est pas disponible. Les stopwords ne pourront pas être filtrés."
             )
         else:
             noms_modeles = _SPACY_MODELES_TENTES or ("fr_core_news_md", "fr_core_news_sm")
             st.warning(
                 "Les modèles spaCy "
                 f"{_formater_noms_modeles(noms_modeles)} n'ont pas pu être chargés. "
-                "Les stopwords ne seront pas filtrés."
+                "Le filtrage des stopwords sera limité."
             )
     elif _SPACY_MODELE_NOM:
         st.caption(f"Modèle spaCy chargé : {_SPACY_MODELE_NOM}")
+    if not filtrer_stopwords:
+        st.caption("Le filtrage des stopwords est désactivé pour cette analyse.")
 
     mot_cle_saisi = st.text_input(
         "Mot-clé pour une analyse ciblée",
@@ -379,6 +401,7 @@ def render_cooccurrences_tab(texte_source: str) -> None:
         texte_source,
         longueur_min=longueur_min,
         granularite="phrase",
+        filtrer_stopwords=filtrer_stopwords,
     )
 
     if df_cooc.empty:
@@ -430,6 +453,7 @@ def render_cooccurrences_tab(texte_source: str) -> None:
             phrase,
             longueur_min=longueur_min,
             modele_spacy=modele_spacy,
+            filtrer_stopwords=filtrer_stopwords,
         )
         if not tokens_phrase:
             continue
