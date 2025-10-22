@@ -24,6 +24,7 @@ import streamlit as st
 from typing import List, Dict, Tuple, Any, Optional
 
 from stats import render_stats_tab
+from cooccurrences import render_cooccurrences_tab
 
 # =========================
 # Détection Graphviz (pour export JPEG)
@@ -1013,13 +1014,14 @@ else:
     df_tensions = pd.DataFrame()
 
 # Onglets
-ong1, ong2, ong3, ong4, ong5, ong6, ong_stats = st.tabs([
+ong1, ong2, ong3, ong4, ong5, ong6, ong_cooc, ong_stats = st.tabs([
     "Expressions mappées",
     "Détections",
     "Dictionnaires (JSON)",
     "Guide d’interprétation",
     "conditions logiques : si/alors",
     "Comparatif Regex / spaCy",
+    "Co-occurrences",
     "Stats",
 ])
 
@@ -1394,7 +1396,11 @@ with ong6:
         else:
             st.info("spaCy désactivé (voir la barre latérale).")
 
-# Onglet 7 : Statistiques sur les marqueurs
+# Onglet 7 : Co-occurrences
+with ong_cooc:
+    render_cooccurrences_tab(texte_source)
+
+# Onglet 8 : Statistiques sur les marqueurs
 with ong_stats:
     render_stats_tab(
         texte_source,
