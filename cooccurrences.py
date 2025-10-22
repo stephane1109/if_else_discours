@@ -393,23 +393,7 @@ def render_cooccurrences_tab(texte_source: str) -> None:
         )
         return
 
-    max_occ = int(df_mot_cle["occurrences"].max())
-    filtre_occ = st.slider(
-        "Occurrences minimales",
-        min_value=1,
-        max_value=max_occ,
-        value=1,
-        help=(
-            "Filtre les co-occurrences en fonction du nombre de phrases où elles apparaissent."
-        ),
-    )
-    df_filtre = df_mot_cle[df_mot_cle["occurrences"] >= filtre_occ]
-
-    if df_filtre.empty:
-        st.info(
-            "Le seuil minimal sélectionné exclut toutes les co-occurrences associées au mot-clé."
-        )
-        return
+    df_filtre = df_mot_cle.copy()
 
     st.markdown(
         "### Co-occurrences associées à « "
