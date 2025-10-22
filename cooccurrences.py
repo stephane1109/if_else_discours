@@ -8,15 +8,44 @@ from __future__ import annotations
 import math
 import re
 from collections import Counter
+from functools import lru_cache
 from itertools import combinations
-from typing import Iterable, List
+from typing import Iterable, List, Optional
 
 import altair as alt
 import pandas as pd
 import streamlit as st
 
+try:  # pragma: no cover - dépendance optionnelle à l'import
+    import spacy
+    from spacy.language import Language
+except ImportError:  # pragma: no cover - spaCy non installé
+    spacy = None
+    Language = None
+
+try:  # pragma: no cover - spaCy non installé
+    from spacy.lang.fr.stop_words import STOP_WORDS as SPACY_STOP_WORDS
+except ImportError:  # pragma: no cover - spaCy non installé
+    SPACY_STOP_WORDS = set()
+
 
 _WORD_PATTERN = re.compile(r"[A-Za-zÀ-ÖØ-öø-ÿ']+")
+
+
+@lru_cache(maxsize=1)
+def _charger_modele_spacy() -> Optional["Language"]:
+    """Charge le modèle spaCy français en le mettant en cache."""
+
+    if spacy is None:
+        return None
+    try:
+        return spacy.load("fr_core_news_sm")
+    except OSError:
+        # Le modèle n'est pas disponible localement
+        return None
+    except Exception:
+        # Toute autre erreur (par ex. incompatibilité) -> désactive le filtrage
+        return None
 
 
 def _segmenter_en_phrases(texte: str) -> List[str]:
@@ -27,19 +56,56 @@ def _segmenter_en_phrases(texte: str) -> List[str]:
     return [m.strip() for m in morceaux if m and m.strip()]
 
 
-def _extraire_mots(phrase: str, longueur_min: int = 2) -> List[str]:
+def _extraire_mots(
+    phrase: str,
+    *,
+    longueur_min: int = 2,
+    modele_spacy: Optional["Language"] = None,
+) -> List[str]:
     """Extrait des mots en minuscule, filtrés sur la longueur minimale."""
     if not phrase:
         return []
+
+    if modele_spacy is None:
+        modele_spacy = _charger_modele_spacy()
+
+    if modele_spacy is not None:
+        doc = modele_spacy(phrase)
+        tokens = []
+        for token in doc:
+            if not token.is_alpha:
+                continue
+            if len(token.text) < longueur_min:
+                continue
+            if token.is_stop:
+                continue
+            lemme = token.lemma_.lower() if token.lemma_ else token.text.lower()
+            tokens.append(lemme)
+        if tokens:
+            return tokens
+
     mots = [m.lower() for m in _WORD_PATTERN.findall(phrase)]
-    return [m for m in mots if len(m) >= longueur_min]
+    stopwords = SPACY_STOP_WORDS if SPACY_STOP_WORDS else set()
+    return [m for m in mots if len(m) >= longueur_min and m not in stopwords]
 
 
-def _generer_cooccurrences(phrases: Iterable[str], longueur_min: int = 2) -> Counter[str]:
+def _generer_cooccurrences(
+    phrases: Iterable[str],
+    longueur_min: int = 2,
+    modele_spacy: Optional["Language"] = None,
+) -> Counter[str]:
     """Compte les co-occurrences (paires ordonnées lexicographiquement) par phrase."""
     compteurs: Counter[str] = Counter()
     for phrase in phrases:
-        tokens = sorted(set(_extraire_mots(phrase, longueur_min=longueur_min)))
+        tokens = sorted(
+            set(
+                _extraire_mots(
+                    phrase,
+                    longueur_min=longueur_min,
+                    modele_spacy=modele_spacy,
+                )
+            )
+        )
         if len(tokens) < 2:
             continue
         for mot1, mot2 in combinations(tokens, 2):
@@ -51,7 +117,12 @@ def _generer_cooccurrences(phrases: Iterable[str], longueur_min: int = 2) -> Cou
 def calculer_table_cooccurrences(texte: str, longueur_min: int = 2) -> pd.DataFrame:
     """Retourne un DataFrame des co-occurrences triées par fréquence décroissante."""
     phrases = _segmenter_en_phrases(texte)
-    compteur = _generer_cooccurrences(phrases, longueur_min=longueur_min)
+    modele_spacy = _charger_modele_spacy()
+    compteur = _generer_cooccurrences(
+        phrases,
+        longueur_min=longueur_min,
+        modele_spacy=modele_spacy,
+    )
     if not compteur:
         return pd.DataFrame(columns=["mot1", "mot2", "pair", "occurrences"])
 
@@ -144,6 +215,13 @@ def render_cooccurrences_tab(texte_source: str) -> None:
         value=2,
         help="Les mots plus courts que cette valeur sont ignorés pour stabiliser les co-occurrences.",
     )
+
+    modele_spacy = _charger_modele_spacy()
+    if modele_spacy is None:
+        st.warning(
+            "Le modèle spaCy 'fr_core_news_sm' n'a pas pu être chargé. "
+            "Les stopwords ne seront pas filtrés."
+        )
 
     df_cooc = calculer_table_cooccurrences(texte_source, longueur_min=longueur_min)
 
