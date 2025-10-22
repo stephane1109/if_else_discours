@@ -330,8 +330,8 @@ def _filtrer_cooccurrences_par_mot_cle(df: pd.DataFrame, mot_cle: str) -> pd.Dat
 
 
 def render_cooccurrences_tab(texte_source: str) -> None:
-    """Affiche l'onglet Streamlit consacré aux co-occurrences."""
-    st.subheader("Analyse des co-occurrences")
+    """Affiche l'onglet Streamlit consacré aux co-occurrences par mot-clé."""
+    st.subheader("Analyse des co-occurrences par mot-clé")
 
     if not texte_source or not texte_source.strip():
         st.info("Saisissez ou chargez un texte pour analyser les co-occurrences.")
@@ -345,19 +345,10 @@ def render_cooccurrences_tab(texte_source: str) -> None:
         help="Les mots plus courts que cette valeur sont ignorés pour stabiliser les co-occurrences.",
     )
 
-    granularite = st.radio(
-        "Granularité de calcul",
-        (
-            "Document complet",
-            "Phrase par phrase",
-        ),
-        index=0,
-        help=(
-            "Choisissez si les co-occurrences doivent être calculées sur l'ensemble du "
-            "document ou indépendamment pour chaque phrase."
-        ),
+    st.caption(
+        "Les co-occurrences sont calculées phrase par phrase. Deux mots sont considérés "
+        "comme co-occurrents s'ils apparaissent dans la même phrase."
     )
-    granularite_interne = "document" if granularite == "Document complet" else "phrase"
 
     modele_spacy = _charger_modele_spacy()
     if modele_spacy is None:
@@ -375,114 +366,67 @@ def render_cooccurrences_tab(texte_source: str) -> None:
     elif _SPACY_MODELE_NOM:
         st.caption(f"Modèle spaCy chargé : {_SPACY_MODELE_NOM}")
 
+    mot_cle_saisi = st.text_input(
+        "Mot-clé pour une analyse ciblée",
+        help="Analyse les co-occurrences limitées au mot indiqué.",
+    )
+    mot_cle_analyse = mot_cle_saisi.strip()
+    if not mot_cle_analyse:
+        st.info("Saisissez un mot-clé pour lancer l'analyse ciblée des co-occurrences.")
+        return
+
     df_cooc = calculer_table_cooccurrences(
         texte_source,
         longueur_min=longueur_min,
-        granularite=granularite_interne,
+        granularite="phrase",
     )
 
     if df_cooc.empty:
         st.info("Aucune co-occurrence n'a été détectée avec les paramètres actuels.")
         return
 
-    max_occ = int(df_cooc["occurrences"].max())
-    aide_occurrences = (
-        "Filtre les co-occurrences en fonction du nombre de combinaisons de mots "
-        "observées dans le document."
-        if granularite_interne == "document"
-        else "Filtre les co-occurrences en fonction du nombre de phrases où elles apparaissent."
-    )
+    df_mot_cle = _filtrer_cooccurrences_par_mot_cle(df_cooc, mot_cle_analyse)
+    if df_mot_cle.empty:
+        st.info(
+            "Aucune co-occurrence ne contient le mot-clé « "
+            f"{html.escape(mot_cle_analyse)} » avec les paramètres sélectionnés."
+        )
+        return
+
+    max_occ = int(df_mot_cle["occurrences"].max())
     filtre_occ = st.slider(
         "Occurrences minimales",
         min_value=1,
         max_value=max_occ,
         value=1,
-        help=aide_occurrences,
-    )
-    df_filtre = df_cooc[df_cooc["occurrences"] >= filtre_occ]
-
-    if df_filtre.empty:
-        st.info("Aucune co-occurrence ne correspond au seuil minimal sélectionné.")
-        return
-
-    mot_cle_saisi = st.text_input(
-        "Mot-clé pour une analyse ciblée",
         help=(
-            "Filtre les co-occurrences pour ne conserver que celles qui impliquent le mot"
-            " indiqué. Laissez vide pour conserver toutes les co-occurrences."
+            "Filtre les co-occurrences en fonction du nombre de phrases où elles apparaissent."
         ),
     )
-    mot_cle_analyse = mot_cle_saisi.strip()
-    df_mot_cle = pd.DataFrame()
-    if mot_cle_analyse:
-        df_mot_cle = _filtrer_cooccurrences_par_mot_cle(df_filtre, mot_cle_analyse)
-        if df_mot_cle.empty:
-            st.info(
-                "Aucune co-occurrence ne contient le mot-clé « "
-                f"{html.escape(mot_cle_analyse)} » avec les paramètres sélectionnés."
-            )
-        else:
-            st.markdown(
-                "### Co-occurrences associées à « "
-                f"{html.escape(mot_cle_analyse)} »"
-            )
-            st.dataframe(
-                df_mot_cle[["mot_associe", "pair", "occurrences"]]
-                .rename(columns={"mot_associe": "Mot associé"}),
-                use_container_width=True,
-                hide_index=True,
-            )
-            total_occurrences = int(df_mot_cle["occurrences"].sum())
-            nb_associes = int(df_mot_cle["mot_associe"].nunique())
-            st.caption(
-                f"Le mot-clé apparaît dans {nb_associes} co-occurrence(s) distincte(s) "
-                f"pour un total de {total_occurrences} occurrence(s)."
-            )
+    df_filtre = df_mot_cle[df_mot_cle["occurrences"] >= filtre_occ]
 
-    if granularite_interne == "document":
-        st.caption(
-            "Les co-occurrences sont calculées à l'échelle du document : deux mots "
-            "coexistent dès lors qu'ils figurent tous deux dans le texte."
+    if df_filtre.empty:
+        st.info(
+            "Le seuil minimal sélectionné exclut toutes les co-occurrences associées au mot-clé."
         )
-    else:
-        st.caption(
-            "Les co-occurrences sont calculées phrase par phrase : deux mots co-"
-            "occurrents s'ils apparaissent dans la même phrase."
-        )
+        return
 
-    st.dataframe(df_filtre, use_container_width=True, hide_index=True)
-
-    top_default = min(20, len(df_filtre))
-    max_top = max(5, len(df_filtre))
-    if top_default < 5:
-        top_default = max_top
-    top_n = st.number_input(
-        "Nombre de co-occurrences à afficher dans le graphique",
-        min_value=5,
-        max_value=max_top,
-        value=top_default,
-        step=1,
+    st.markdown(
+        "### Co-occurrences associées à « "
+        f"{html.escape(mot_cle_analyse)} »"
     )
-
-    chart = _graphique_barres_cooccurrences(df_filtre, int(top_n))
-    if chart is not None:
-        st.altair_chart(chart, use_container_width=True)
-
-    st.markdown("### Nuage de mots des co-occurrences")
-    max_mots_max = max(5, len(df_filtre))
-    max_mots = st.slider(
-        "Nombre de co-occurrences dans le nuage de mots",
-        min_value=5,
-        max_value=max_mots_max,
-        value=min(30, max_mots_max),
-        step=1,
+    st.dataframe(
+        df_filtre[["mot_associe", "pair", "occurrences"]]
+        .rename(columns={"mot_associe": "Mot associé"}),
+        use_container_width=True,
+        hide_index=True,
     )
-
-    word_cloud_chart = _nuage_de_mots(df_filtre, int(max_mots))
-    if word_cloud_chart is not None:
-        st.altair_chart(word_cloud_chart, use_container_width=True)
-    else:
-        st.info("Impossible de générer le nuage de mots avec les paramètres sélectionnés.")
+    total_occurrences = int(df_filtre["occurrences"].sum())
+    nb_associes = int(df_filtre["mot_associe"].nunique())
+    st.caption(
+        f"Le mot-clé apparaît dans {nb_associes} co-occurrence(s) distincte(s) "
+        f"pour un total de {total_occurrences} occurrence(s)."
+    )
 
     st.markdown("### Co-occurrences dans le texte")
     phrases = _segmenter_en_phrases(texte_source)
@@ -494,11 +438,6 @@ def render_cooccurrences_tab(texte_source: str) -> None:
         (str(ligne.mot1), str(ligne.mot2))
         for ligne in df_filtre.itertuples(index=False)
     ]
-    if mot_cle_analyse and not df_mot_cle.empty:
-        paires_filtrees = [
-            (str(ligne.mot1), str(ligne.mot2))
-            for ligne in df_mot_cle.itertuples(index=False)
-        ]
     paires_uniques = list(dict.fromkeys(paires_filtrees))
 
     cooccurrences_trouvees = False
