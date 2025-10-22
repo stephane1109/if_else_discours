@@ -435,6 +435,41 @@ def render_cooccurrences_tab(texte_source: str) -> None:
         f"pour un total de {total_occurrences} occurrence(s)."
     )
 
+    st.markdown("### Visualisation des co-occurrences")
+
+    col_barres, col_nuage = st.columns(2)
+    with col_barres:
+        max_barres = max(1, min(30, len(df_filtre)))
+        min_barres = 1 if max_barres < 3 else 3
+        valeur_defaut_barres = min(10, max_barres)
+        top_n = st.slider(
+            "Nombre de co-occurrences à afficher (barres)",
+            min_value=min_barres,
+            max_value=max_barres,
+            value=valeur_defaut_barres,
+        )
+        chart_barres = _graphique_barres_cooccurrences(df_filtre, top_n)
+        if chart_barres is not None:
+            st.altair_chart(chart_barres, use_container_width=True)
+        else:
+            st.caption("Pas de graphique disponible pour les paramètres sélectionnés.")
+
+    with col_nuage:
+        max_nuage = max(1, min(50, len(df_filtre)))
+        min_nuage = 1 if max_nuage < 3 else 3
+        valeur_defaut_nuage = min(20, max_nuage)
+        max_mots = st.slider(
+            "Nombre de co-occurrences dans le nuage",
+            min_value=min_nuage,
+            max_value=max_nuage,
+            value=valeur_defaut_nuage,
+        )
+        chart_nuage = _nuage_de_mots(df_filtre, max_mots)
+        if chart_nuage is not None:
+            st.altair_chart(chart_nuage, use_container_width=True)
+        else:
+            st.caption("Le nuage de mots n'a pas pu être généré.")
+
     st.markdown("### Co-occurrences dans le texte")
     phrases = _segmenter_en_phrases(texte_source)
     if not phrases:
