@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import math
 import re
+import html
 from collections import Counter
 from functools import lru_cache
 from itertools import combinations
@@ -32,20 +33,38 @@ except ImportError:  # pragma: no cover - spaCy non installé
 _WORD_PATTERN = re.compile(r"[A-Za-zÀ-ÖØ-öø-ÿ']+")
 
 
+_SPACY_MODELE_NOM: Optional[str] = None
+_SPACY_MODELES_TENTES: tuple[str, ...] = ()
+
+
 @lru_cache(maxsize=1)
 def _charger_modele_spacy() -> Optional["Language"]:
-    """Charge le modèle spaCy français en le mettant en cache."""
+    """Charge un modèle spaCy français en le mettant en cache."""
+
+    global _SPACY_MODELE_NOM, _SPACY_MODELES_TENTES
 
     if spacy is None:
+        _SPACY_MODELE_NOM = None
+        _SPACY_MODELES_TENTES = ()
         return None
-    try:
-        return spacy.load("fr_core_news_sm")
-    except OSError:
-        # Le modèle n'est pas disponible localement
-        return None
-    except Exception:
-        # Toute autre erreur (par ex. incompatibilité) -> désactive le filtrage
-        return None
+
+    essais: list[str] = []
+    for nom_modele in ("fr_core_news_md", "fr_core_news_sm"):
+        essais.append(nom_modele)
+        try:
+            modele = spacy.load(nom_modele)
+        except OSError:
+            continue
+        except Exception:
+            continue
+        else:
+            _SPACY_MODELE_NOM = nom_modele
+            _SPACY_MODELES_TENTES = tuple(essais)
+            return modele
+
+    _SPACY_MODELE_NOM = None
+    _SPACY_MODELES_TENTES = tuple(essais)
+    return None
 
 
 def _segmenter_en_phrases(texte: str) -> List[str]:
@@ -54,6 +73,15 @@ def _segmenter_en_phrases(texte: str) -> List[str]:
         return []
     morceaux = re.split(r"(?<=[\.\!\?\:\;])\s+", texte)
     return [m.strip() for m in morceaux if m and m.strip()]
+
+
+def _formater_noms_modeles(noms: Iterable[str]) -> str:
+    noms_list = [f"'{nom}'" for nom in noms]
+    if not noms_list:
+        return ""
+    if len(noms_list) == 1:
+        return noms_list[0]
+    return ", ".join(noms_list[:-1]) + f" et {noms_list[-1]}"
 
 
 def _extraire_mots(
@@ -87,6 +115,58 @@ def _extraire_mots(
     mots = [m.lower() for m in _WORD_PATTERN.findall(phrase)]
     stopwords = SPACY_STOP_WORDS if SPACY_STOP_WORDS else set()
     return [m for m in mots if len(m) >= longueur_min and m not in stopwords]
+
+
+def _mettre_en_evidence_mots(
+    phrase: str,
+    mots_cibles: Iterable[str],
+    modele_spacy: Optional["Language"] = None,
+) -> str:
+    """Retourne la phrase en HTML avec les mots cibles entourés de <mark>."""
+
+    mots_cibles_set = {m.lower() for m in mots_cibles if m}
+    if not phrase or not mots_cibles_set:
+        return html.escape(phrase)
+
+    if modele_spacy is not None:
+        try:
+            doc = modele_spacy(phrase)
+        except Exception:
+            doc = None
+    else:
+        doc = None
+
+    if doc is not None:
+        morceaux: list[str] = []
+        dernier_index = 0
+        for token in doc:
+            debut, fin = token.idx, token.idx + len(token.text)
+            if debut >= len(phrase):
+                continue
+            morceaux.append(html.escape(phrase[dernier_index:debut]))
+            lemme = token.lemma_.lower() if token.lemma_ else token.text.lower()
+            texte_token = html.escape(token.text)
+            if lemme in mots_cibles_set:
+                morceaux.append(f"<mark>{texte_token}</mark>")
+            else:
+                morceaux.append(texte_token)
+            dernier_index = fin
+        morceaux.append(html.escape(phrase[dernier_index:]))
+        return "".join(morceaux)
+
+    morceaux: list[str] = []
+    dernier_index = 0
+    for match in _WORD_PATTERN.finditer(phrase):
+        debut, fin = match.start(), match.end()
+        morceaux.append(html.escape(phrase[dernier_index:debut]))
+        mot = match.group(0)
+        if mot.lower() in mots_cibles_set:
+            morceaux.append(f"<mark>{html.escape(mot)}</mark>")
+        else:
+            morceaux.append(html.escape(mot))
+        dernier_index = fin
+    morceaux.append(html.escape(phrase[dernier_index:]))
+    return "".join(morceaux)
 
 
 def _generer_cooccurrences(
@@ -218,10 +298,19 @@ def render_cooccurrences_tab(texte_source: str) -> None:
 
     modele_spacy = _charger_modele_spacy()
     if modele_spacy is None:
-        st.warning(
-            "Le modèle spaCy 'fr_core_news_sm' n'a pas pu être chargé. "
-            "Les stopwords ne seront pas filtrés."
-        )
+        if spacy is None:
+            st.warning(
+                "spaCy n'est pas disponible. Les stopwords ne seront pas filtrés."
+            )
+        else:
+            noms_modeles = _SPACY_MODELES_TENTES or ("fr_core_news_md", "fr_core_news_sm")
+            st.warning(
+                "Les modèles spaCy "
+                f"{_formater_noms_modeles(noms_modeles)} n'ont pas pu être chargés. "
+                "Les stopwords ne seront pas filtrés."
+            )
+    elif _SPACY_MODELE_NOM:
+        st.caption(f"Modèle spaCy chargé : {_SPACY_MODELE_NOM}")
 
     df_cooc = calculer_table_cooccurrences(texte_source, longueur_min=longueur_min)
 
@@ -281,3 +370,52 @@ def render_cooccurrences_tab(texte_source: str) -> None:
         st.altair_chart(word_cloud_chart, use_container_width=True)
     else:
         st.info("Impossible de générer le nuage de mots avec les paramètres sélectionnés.")
+
+    st.markdown("### Co-occurrences dans le texte")
+    phrases = _segmenter_en_phrases(texte_source)
+    if not phrases:
+        st.info("Impossible de segmenter le texte en phrases pour afficher les co-occurrences.")
+        return
+
+    paires_filtrees = [
+        (str(ligne.mot1), str(ligne.mot2))
+        for ligne in df_filtre.itertuples(index=False)
+    ]
+    paires_uniques = list(dict.fromkeys(paires_filtrees))
+
+    cooccurrences_trouvees = False
+    for phrase in phrases:
+        tokens_phrase = _extraire_mots(
+            phrase,
+            longueur_min=longueur_min,
+            modele_spacy=modele_spacy,
+        )
+        if not tokens_phrase:
+            continue
+        tokens_set = set(tokens_phrase)
+        paires_dans_phrase = [
+            pair for pair in paires_uniques if pair[0] in tokens_set and pair[1] in tokens_set
+        ]
+        if not paires_dans_phrase:
+            continue
+
+        cooccurrences_trouvees = True
+        mots_a_surligner = {mot for paire in paires_dans_phrase for mot in paire}
+        phrase_html = _mettre_en_evidence_mots(
+            phrase,
+            mots_a_surligner,
+            modele_spacy=modele_spacy,
+        )
+        st.markdown(
+            f"<div style='margin-bottom:0.25rem'>{phrase_html}</div>",
+            unsafe_allow_html=True,
+        )
+        st.caption(
+            "Co-occurrences : "
+            + ", ".join(f"{mot1} – {mot2}" for mot1, mot2 in paires_dans_phrase)
+        )
+
+    if not cooccurrences_trouvees:
+        st.info(
+            "Aucune des co-occurrences conservées ne figure explicitement dans les phrases."
+        )
