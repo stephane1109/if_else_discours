@@ -1,7 +1,7 @@
 """Analyse de co-occurrences à partir du texte fourni.
 
 Ce module propose un rendu Streamlit avec tableau, graphique Altair et nuage de mots
-pour visualiser les co-occurrences calculées phrase par phrase.
+pour visualiser les co-occurrences calculées à l'échelle de la phrase ou du document.
 """
 from __future__ import annotations
 
@@ -170,12 +170,33 @@ def _mettre_en_evidence_mots(
 
 
 def _generer_cooccurrences(
-    phrases: Iterable[str],
+    texte: str,
+    *,
     longueur_min: int = 2,
     modele_spacy: Optional["Language"] = None,
+    granularite: str = "phrase",
 ) -> Counter[str]:
-    """Compte les co-occurrences (paires ordonnées lexicographiquement) par phrase."""
+    """Compte les co-occurrences selon la granularité demandée."""
+
     compteurs: Counter[str] = Counter()
+
+    if granularite == "document":
+        tokens = _extraire_mots(
+            texte,
+            longueur_min=longueur_min,
+            modele_spacy=modele_spacy,
+        )
+        if len(tokens) < 2:
+            return compteurs
+        frequences = Counter(tokens)
+        mots_uniques = sorted(frequences.keys())
+        for idx, mot1 in enumerate(mots_uniques):
+            for mot2 in mots_uniques[idx + 1 :]:
+                pair = f"{mot1}_{mot2}"
+                compteurs[pair] = frequences[mot1] * frequences[mot2]
+        return compteurs
+
+    phrases = _segmenter_en_phrases(texte)
     for phrase in phrases:
         tokens = sorted(
             set(
@@ -194,14 +215,19 @@ def _generer_cooccurrences(
     return compteurs
 
 
-def calculer_table_cooccurrences(texte: str, longueur_min: int = 2) -> pd.DataFrame:
+def calculer_table_cooccurrences(
+    texte: str,
+    *,
+    longueur_min: int = 2,
+    granularite: str = "phrase",
+) -> pd.DataFrame:
     """Retourne un DataFrame des co-occurrences triées par fréquence décroissante."""
-    phrases = _segmenter_en_phrases(texte)
     modele_spacy = _charger_modele_spacy()
     compteur = _generer_cooccurrences(
-        phrases,
+        texte,
         longueur_min=longueur_min,
         modele_spacy=modele_spacy,
+        granularite=granularite,
     )
     if not compteur:
         return pd.DataFrame(columns=["mot1", "mot2", "pair", "occurrences"])
@@ -282,7 +308,7 @@ def _nuage_de_mots(df: pd.DataFrame, max_mots: int) -> alt.Chart | None:
 
 def render_cooccurrences_tab(texte_source: str) -> None:
     """Affiche l'onglet Streamlit consacré aux co-occurrences."""
-    st.subheader("Co-occurrences par phrase")
+    st.subheader("Analyse des co-occurrences")
 
     if not texte_source or not texte_source.strip():
         st.info("Saisissez ou chargez un texte pour analyser les co-occurrences.")
@@ -295,6 +321,20 @@ def render_cooccurrences_tab(texte_source: str) -> None:
         value=2,
         help="Les mots plus courts que cette valeur sont ignorés pour stabiliser les co-occurrences.",
     )
+
+    granularite = st.radio(
+        "Granularité de calcul",
+        (
+            "Document complet",
+            "Phrase par phrase",
+        ),
+        index=0,
+        help=(
+            "Choisissez si les co-occurrences doivent être calculées sur l'ensemble du "
+            "document ou indépendamment pour chaque phrase."
+        ),
+    )
+    granularite_interne = "document" if granularite == "Document complet" else "phrase"
 
     modele_spacy = _charger_modele_spacy()
     if modele_spacy is None:
@@ -312,30 +352,72 @@ def render_cooccurrences_tab(texte_source: str) -> None:
     elif _SPACY_MODELE_NOM:
         st.caption(f"Modèle spaCy chargé : {_SPACY_MODELE_NOM}")
 
-    df_cooc = calculer_table_cooccurrences(texte_source, longueur_min=longueur_min)
+    df_cooc = calculer_table_cooccurrences(
+        texte_source,
+        longueur_min=longueur_min,
+        granularite=granularite_interne,
+    )
+
+    mot_cle = (
+        st.text_input(
+            "Filtrer par mot-clé",
+            value="",
+            help=(
+                "Limiter l'analyse aux co-occurrences contenant ce mot. "
+                "Utilisez la même forme que celle extraite (ex. lemme)."
+            ),
+        )
+        .strip()
+        .lower()
+    )
+
+    if mot_cle:
+        df_cooc = df_cooc[(df_cooc["mot1"] == mot_cle) | (df_cooc["mot2"] == mot_cle)]
 
     if df_cooc.empty:
-        st.info("Aucune co-occurrence n'a été détectée avec les paramètres actuels.")
+        if mot_cle:
+            st.info(
+                "Aucune co-occurrence ne contient le mot-clé spécifié avec les paramètres actuels."
+            )
+        else:
+            st.info("Aucune co-occurrence n'a été détectée avec les paramètres actuels.")
         return
 
     max_occ = int(df_cooc["occurrences"].max())
+    aide_occurrences = (
+        "Filtre les co-occurrences en fonction du nombre de combinaisons de mots "
+        "observées dans le document."
+        if granularite_interne == "document"
+        else "Filtre les co-occurrences en fonction du nombre de phrases où elles apparaissent."
+    )
     filtre_occ = st.slider(
         "Occurrences minimales",
         min_value=1,
         max_value=max_occ,
         value=1,
-        help="Filtre les co-occurrences en fonction du nombre de phrases où elles apparaissent.",
+        help=aide_occurrences,
     )
     df_filtre = df_cooc[df_cooc["occurrences"] >= filtre_occ]
 
     if df_filtre.empty:
-        st.info("Aucune co-occurrence ne correspond au seuil minimal sélectionné.")
+        if mot_cle:
+            st.info(
+                "Aucune co-occurrence ne contient le mot-clé sélectionné au-dessus du seuil minimal."
+            )
+        else:
+            st.info("Aucune co-occurrence ne correspond au seuil minimal sélectionné.")
         return
 
-    st.caption(
-        "Les co-occurrences sont calculées phrase par phrase : deux mots co-occurent si "
-        "ils apparaissent dans la même phrase."
-    )
+    if granularite_interne == "document":
+        st.caption(
+            "Les co-occurrences sont calculées à l'échelle du document : deux mots "
+            "coexistent dès lors qu'ils figurent tous deux dans le texte."
+        )
+    else:
+        st.caption(
+            "Les co-occurrences sont calculées phrase par phrase : deux mots co-"
+            "occurrents s'ils apparaissent dans la même phrase."
+        )
 
     st.dataframe(df_filtre, use_container_width=True, hide_index=True)
 
@@ -401,6 +483,8 @@ def render_cooccurrences_tab(texte_source: str) -> None:
 
         cooccurrences_trouvees = True
         mots_a_surligner = {mot for paire in paires_dans_phrase for mot in paire}
+        if mot_cle:
+            mots_a_surligner.add(mot_cle)
         phrase_html = _mettre_en_evidence_mots(
             phrase,
             mots_a_surligner,
