@@ -5,7 +5,6 @@ pour visualiser les co-occurrences calculées à l'échelle de la phrase ou du d
 """
 from __future__ import annotations
 
-import math
 import re
 import html
 from collections import Counter
@@ -16,6 +15,11 @@ from typing import Iterable, List, Optional
 import altair as alt
 import pandas as pd
 import streamlit as st
+
+try:  # pragma: no cover - dépendance optionnelle à l'import
+    from wordcloud import WordCloud
+except ImportError:  # pragma: no cover - WordCloud non installée
+    WordCloud = None
 
 try:  # pragma: no cover - dépendance optionnelle à l'import
     import spacy
@@ -286,38 +290,37 @@ def _graphique_barres_cooccurrences(df: pd.DataFrame, top_n: int) -> alt.Chart |
     return chart
 
 
-def _nuage_de_mots(df: pd.DataFrame, max_mots: int) -> alt.Chart | None:
-    """Construit un nuage de mots (mise en grille) pour visualiser les co-occurrences."""
+def _nuage_de_mots(df: pd.DataFrame, max_mots: int):
+    """Construit un nuage de mots via la librairie WordCloud."""
+
+    if WordCloud is None:
+        return None
+
     if df.empty:
         return None
 
     data = df.head(max_mots).copy()
-    data["rang"] = range(len(data))
     if data.empty:
         return None
 
-    nb_cols = max(4, int(math.sqrt(len(data))) or 1)
-    data["colonne"] = data["rang"] % nb_cols
-    data["ligne"] = -(data["rang"] // nb_cols)
+    frequences = {
+        str(ligne.pair): int(ligne.occurrences)
+        for ligne in data.itertuples(index=False)
+        if getattr(ligne, "occurrences", 0)
+    }
 
-    chart = (
-        alt.Chart(data)
-        .mark_text(baseline="middle", align="center")
-        .encode(
-            x=alt.X("colonne:Q", axis=None),
-            y=alt.Y("ligne:Q", axis=None),
-            text=alt.Text("pair:N"),
-            size=alt.Size("occurrences:Q", scale=alt.Scale(range=[10, 80])),
-            color=alt.Color("occurrences:Q", scale=alt.Scale(scheme="plasma"), legend=None),
-            tooltip=[
-                alt.Tooltip("pair:N", title="Co-occurrence"),
-                alt.Tooltip("occurrences:Q", title="Occurrences"),
-            ],
-        )
-        .configure_view(strokeWidth=0)
-        .properties(width=700, height=400)
-    )
-    return chart
+    if not frequences:
+        return None
+
+    nuage = WordCloud(
+        width=800,
+        height=400,
+        background_color="white",
+        prefer_horizontal=1.0,
+        colormap="plasma",
+    ).generate_from_frequencies(frequences)
+
+    return nuage.to_array()
 
 
 def _filtrer_cooccurrences_par_mot_cle(df: pd.DataFrame, mot_cle: str) -> pd.DataFrame:
@@ -437,36 +440,40 @@ def render_cooccurrences_tab(texte_source: str) -> None:
 
     st.markdown("### Visualisation des co-occurrences")
 
-    col_barres, col_nuage = st.columns(2)
-    with col_barres:
-        max_barres = max(1, min(30, len(df_filtre)))
-        min_barres = 1 if max_barres < 3 else 3
-        valeur_defaut_barres = min(10, max_barres)
-        top_n = st.slider(
-            "Nombre de co-occurrences à afficher (barres)",
-            min_value=min_barres,
-            max_value=max_barres,
-            value=valeur_defaut_barres,
-        )
-        chart_barres = _graphique_barres_cooccurrences(df_filtre, top_n)
-        if chart_barres is not None:
-            st.altair_chart(chart_barres, use_container_width=True)
-        else:
-            st.caption("Pas de graphique disponible pour les paramètres sélectionnés.")
+    max_barres = max(1, min(30, len(df_filtre)))
+    min_barres = 1 if max_barres < 3 else 3
+    valeur_defaut_barres = min(10, max_barres)
+    top_n = st.slider(
+        "Nombre de co-occurrences à afficher (barres)",
+        min_value=min_barres,
+        max_value=max_barres,
+        value=valeur_defaut_barres,
+    )
+    chart_barres = _graphique_barres_cooccurrences(df_filtre, top_n)
+    if chart_barres is not None:
+        st.altair_chart(chart_barres, use_container_width=True)
+    else:
+        st.caption("Pas de graphique disponible pour les paramètres sélectionnés.")
 
-    with col_nuage:
-        max_nuage = max(1, min(50, len(df_filtre)))
-        min_nuage = 1 if max_nuage < 3 else 3
-        valeur_defaut_nuage = min(20, max_nuage)
-        max_mots = st.slider(
-            "Nombre de co-occurrences dans le nuage",
-            min_value=min_nuage,
-            max_value=max_nuage,
-            value=valeur_defaut_nuage,
-        )
-        chart_nuage = _nuage_de_mots(df_filtre, max_mots)
-        if chart_nuage is not None:
-            st.altair_chart(chart_nuage, use_container_width=True)
+    st.markdown("### Nuage de mots des co-occurrences")
+
+    max_nuage = max(1, min(50, len(df_filtre)))
+    min_nuage = 1 if max_nuage < 3 else 3
+    valeur_defaut_nuage = min(20, max_nuage)
+    max_mots = st.slider(
+        "Nombre de co-occurrences dans le nuage",
+        min_value=min_nuage,
+        max_value=max_nuage,
+        value=valeur_defaut_nuage,
+    )
+    image_nuage = _nuage_de_mots(df_filtre, max_mots)
+    if image_nuage is not None:
+        st.image(image_nuage, use_column_width=True)
+    else:
+        if WordCloud is None:
+            st.caption(
+                "Le nuage de mots nécessite l'installation de la librairie WordCloud."
+            )
         else:
             st.caption("Le nuage de mots n'a pas pu être généré.")
 
