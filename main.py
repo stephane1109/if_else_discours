@@ -26,6 +26,7 @@ from typing import List, Dict, Tuple, Any, Optional
 from stats import render_stats_tab
 from stats_norm import render_stats_norm_tab
 from cooccurrences import render_cooccurrences_tab
+from conditions_spacy import analyser_conditions_spacy
 
 # =========================
 # Détection Graphviz (pour export JPEG)
@@ -1342,6 +1343,38 @@ with ong5:
                 with st.expander("Voir la phrase complète"):
                     st.write(sel["phrase"])
                 st.markdown("---")
+
+        st.markdown("### Analyse spaCy (modèle fr_core_news_md)")
+        if not SPACY_OK or NLP is None:
+            st.info(
+                "spaCy FR n'est pas disponible. Installez par exemple "
+                "`fr_core_news_md` pour activer cette analyse."
+            )
+        else:
+            df_conditions_spacy = analyser_conditions_spacy(
+                texte_source,
+                NLP,
+                sorted(COND_TERMS),
+                sorted(ALORS_TERMS),
+                sorted(ALT_TERMS),
+            )
+            if df_conditions_spacy.empty:
+                st.info(
+                    "Aucune structure conditionnelle n'a été identifiée par spaCy."
+                )
+            else:
+                st.dataframe(
+                    df_conditions_spacy,
+                    use_container_width=True,
+                    hide_index=True,
+                )
+                st.download_button(
+                    "Exporter l'analyse spaCy (CSV)",
+                    data=df_conditions_spacy.to_csv(index=False).encode("utf-8"),
+                    file_name="conditions_spacy.csv",
+                    mime="text/csv",
+                    key="dl_conditions_spacy_csv",
+                )
 
 # Onglet 6 : Comparatif Regex / spaCy
 with ong6:
