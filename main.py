@@ -1257,14 +1257,12 @@ with ong4:
 
     st.markdown("#### Marqueurs \"mémoire\" (cognitifs)")
     st.markdown(
-        "- **MEM_SELF** : référence à soi ou à son vécu pour asseoir la crédibilité.\n"
-        "- **MEM_GROUP** : mémoire partagée d’un groupe (« nous », collectif).\n"
-        "- **MEM_NATION** : récit ou imaginaire national, héritage commun.\n"
-        "- **MEM_HIST** : rappel d’événements ou de figures historiques.\n"
-        "- **MEM_VAL** : évocation de valeurs ou d’idéaux fondateurs (justice, dignité…).\n"
-        "- **MEM_FEAR** : souvenirs anxiogènes, menaces ou mises en garde.\n"
-        "- **MEM_HOPE** : souvenirs porteurs d’espoir, horizon positif.\n"
-        "- **MEM_RITUAL** : formules rituelles (remerciements, hommages, solennité)."
+        "- **MEM_PERS** : souvenirs ou expériences personnelles mobilisés dans le discours.\n"
+        "- **MEM_COLL** : mémoire partagée, appel au « nous » collectif.\n"
+        "- **MEM_RAPPEL** : injonctions ou formules pour ne pas oublier un fait.\n"
+        "- **MEM_RENVOI** : renvoi à des propos ou engagements déjà formulés.\n"
+        "- **MEM_REPET** : marqueurs de répétition ou d’insistance (encore, déjà…).\n"
+        "- **MEM_PASSE** : ancrage explicite dans un temps passé (jadis, auparavant…)."
     )
 
     st.markdown("#### Marqueurs \"si… alors / sinon\"")
