@@ -73,6 +73,10 @@ try:
             NLP = modele
             SPACY_OK = True
             SPACY_STATUS.append(f"Modèle spaCy chargé : {name}")
+            if name == "fr_core_news_sm":
+                SPACY_STATUS.append(
+                    "Le modèle moyen 'fr_core_news_md' est recommandé pour de meilleures analyses."
+                )
             break
     if not SPACY_OK:
         SPACY_STATUS.append("Aucun modèle spaCy FR n'a pu être chargé.")
