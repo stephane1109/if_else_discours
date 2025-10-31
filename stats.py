@@ -196,7 +196,7 @@ def graphique_altair_chronologie(
             tooltip=[
                 alt.Tooltip("t_rel:Q", title="Progression (%)", format=".2f"),
                 alt.Tooltip("id_phrase:Q", title="Phrase #"),
-                alt.Tooltip("surface:N", title="Surface"),
+                alt.Tooltip("surface:N", title="mot"),
                 alt.Tooltip("etiquette:N", title="Marqueur"),
                 alt.Tooltip("type:N", title="Type"),
             ],
