@@ -24,6 +24,7 @@ import streamlit as st
 from typing import List, Dict, Tuple, Any, Optional
 
 from stats import render_stats_tab
+from stats_norm import render_stats_norm_tab
 from cooccurrences import render_cooccurrences_tab
 
 # =========================
@@ -1014,7 +1015,7 @@ else:
     df_tensions = pd.DataFrame()
 
 # Onglets
-ong1, ong2, ong3, ong4, ong5, ong6, ong_cooc, ong_stats = st.tabs([
+ong1, ong2, ong3, ong4, ong5, ong6, ong_cooc, ong_stats, ong_stats_norm = st.tabs([
     "Expressions mappées",
     "Détections",
     "Dictionnaires (JSON)",
@@ -1023,6 +1024,7 @@ ong1, ong2, ong3, ong4, ong5, ong6, ong_cooc, ong_stats = st.tabs([
     "Comparatif Regex / spaCy",
     "Co-occurrences",
     "Stats",
+    "Stats norm",
 ])
 
 # Onglet 1 : Expressions mappées
@@ -1411,3 +1413,6 @@ with ong_stats:
         df_causes_lex,
         df_tensions,
     )
+
+with ong_stats_norm:
+    render_stats_norm_tab(texte_source)
