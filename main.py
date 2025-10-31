@@ -1024,7 +1024,7 @@ ong1, ong2, ong3, ong4, ong5, ong6, ong_cooc, ong_stats, ong_stats_norm = st.tab
     "Expressions mappées",
     "Détections",
     "Dictionnaires (JSON)",
-    "Guide d’interprétation",
+    "Lexique",
     "conditions logiques : si/alors",
     "Comparatif Regex / spaCy",
     "Co-occurrences",
@@ -1220,9 +1220,14 @@ with ong3:
     st.markdown("**souvenirs.json**")
     st.json(DICO_MEMOIRES, expanded=False)
 
-# Onglet 4 : Guide d’interprétation
+# Onglet 4 : Lexique
 with ong4:
-    st.subheader("Guide d’interprétation : Python vs analyse de discours")
+    st.subheader("Lexique : Python et analyse de discours")
+
+    st.markdown("#### Lexique des termes clés")
+    st.markdown(
+        "- **APODOSE** : Proposition principale qui, placée après une subordonnée conditionnelle (protase), en indique la conséquence. Exemple : *Si j’insiste* (protase), *il viendra* (apodose)."
+    )
 
     st.markdown("#### Connecteurs \"logiques\" (façon Python)")
     st.markdown(
