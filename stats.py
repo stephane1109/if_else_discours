@@ -249,6 +249,51 @@ def graphique_barres_marqueurs_temps(
     return chart
 
 
+def graphique_barres_familles_connecteurs(
+    df_conn: pd.DataFrame,
+):
+    """Construit un graphique de la répartition des connecteurs par famille."""
+
+    if df_conn is None or df_conn.empty:
+        return None
+
+    if "code" not in df_conn.columns:
+        return None
+
+    series_codes = df_conn["code"].dropna().astype(str).str.strip()
+    series_codes = series_codes[series_codes != ""]
+    if series_codes.empty:
+        return None
+
+    df_freq = (
+        series_codes.str.upper()
+        .value_counts()
+        .rename_axis("code")
+        .reset_index(name="occurrences")
+    )
+
+    if df_freq.empty:
+        return None
+
+    df_freq.sort_values(by=["occurrences", "code"], ascending=[False, True], inplace=True)
+
+    chart = (
+        alt.Chart(df_freq)
+        .mark_bar()
+        .encode(
+            x=alt.X("occurrences:Q", title="Occurrences dans le discours"),
+            y=alt.Y("code:N", title="Famille", sort="-x"),
+            color=alt.Color("code:N", title="Famille"),
+            tooltip=[
+                alt.Tooltip("code:N", title="Famille"),
+                alt.Tooltip("occurrences:Q", title="Occurrences"),
+            ],
+        )
+        .properties(height=320)
+    )
+    return chart
+
+
 def render_stats_tab(
     texte_source: str,
     df_conn: pd.DataFrame,
@@ -259,6 +304,15 @@ def render_stats_tab(
     df_tensions: pd.DataFrame,
 ) -> None:
     """Affiche les statistiques des marqueurs dans l'onglet Streamlit dédié."""
+    st.subheader("Familles de connecteurs")
+    chart_familles_conn = graphique_barres_familles_connecteurs(df_conn)
+    if chart_familles_conn is None:
+        st.info("Aucun connecteur détecté pour générer la répartition par famille.")
+    else:
+        st.altair_chart(chart_familles_conn, use_container_width=True)
+
+    st.markdown("---")
+
     st.subheader("Statistiques des marqueurs normatifs, mémoire & tensions sémantiques")
 
     df_temps = construire_df_temps(
