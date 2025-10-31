@@ -1415,4 +1415,11 @@ with ong_stats:
     )
 
 with ong_stats_norm:
-    render_stats_norm_tab(texte_source)
+    render_stats_norm_tab(
+        texte_source,
+        df_conn,
+        df_marq,
+        df_memoires,
+        df_consq_lex,
+        df_causes_lex,
+    )
