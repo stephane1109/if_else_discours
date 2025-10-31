@@ -1271,6 +1271,13 @@ with ong4:
         "- **APODOSE / ALORS** : pointe la conséquence attendue (« alors », « donc », « dès lors… »)."
     )
 
+    st.markdown("#### Lexique grammatical spaCy (causalité)")
+    st.markdown(
+        "- **CAUSE_GN** : cause exprimée par un groupe nominal (souvent introduit par *en raison de*, *à cause de*…). Exemple : *En raison de la tempête, le match est reporté.*\n"
+        "- **CONSEQUENCE_ADV** : conséquence exprimée par un adverbe ou un groupe adverbial (ex. *donc*, *par conséquent*). Exemple : *Il a tout expliqué, par conséquent nous comprenons la décision.*\n"
+        "- **CAUSE_SUBORDONNEE** : cause formulée par une proposition subordonnée (ex. *parce que*, *puisque*…). Exemple : *Parce qu’il pleuvait, la cérémonie a été déplacée à l’intérieur.*"
+    )
+
 # Onglet 5 : conditions logiques : si/alors
 with ong5:
     st.subheader("Segments conditionnels détectés (SI / ALORS / SINON / TANT QUE)")
