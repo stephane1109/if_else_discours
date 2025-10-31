@@ -387,7 +387,10 @@ def render_cooccurrences_tab(texte_source: str) -> None:
                 "Le filtrage des stopwords sera limité."
             )
     elif _SPACY_MODELE_NOM:
-        st.caption(f"Modèle spaCy chargé : {_SPACY_MODELE_NOM}")
+        message = f"Modèle spaCy chargé : {_SPACY_MODELE_NOM}"
+        if _SPACY_MODELE_NOM == "fr_core_news_sm":
+            message += " (installez 'fr_core_news_md' pour des résultats enrichis)"
+        st.caption(message)
     if not filtrer_stopwords:
         st.caption("Le filtrage des stopwords est désactivé pour cette analyse.")
 
