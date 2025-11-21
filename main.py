@@ -1273,6 +1273,9 @@ with st.sidebar:
 st.markdown("### Source du discours")
 mode_source = st.radio("Choisir la source du texte", ["Fichier .txt", "Zone de texte"], index=0, horizontal=True)
 
+nom_discours_1 = "Discours 1"
+nom_discours_2 = "Discours 2"
+
 texte_source = ""
 texte_source_2 = ""
 if mode_source == "Fichier .txt":
@@ -1291,6 +1294,7 @@ if mode_source == "Fichier .txt":
     if fichier_txt is not None:
         try:
             texte_source = lire_fichier_txt(fichier_txt)
+            nom_discours_1 = fichier_txt.name
             st.success(
                 f"Fichier chargé : {fichier_txt.name} • {len(texte_source)} caractères"
             )
@@ -1299,6 +1303,7 @@ if mode_source == "Fichier .txt":
     if fichier_txt_2 is not None:
         try:
             texte_source_2 = lire_fichier_txt(fichier_txt_2)
+            nom_discours_2 = fichier_txt_2.name
             st.success(
                 f"Second fichier chargé : {fichier_txt_2.name} • {len(texte_source_2)} caractères"
             )
@@ -1329,6 +1334,24 @@ df_memoires = detections_1["df_memoires"]
 df_consq_lex = detections_1["df_consq_lex"]
 df_causes_lex = detections_1["df_causes_lex"]
 df_tensions = detections_1["df_tensions"]
+df_conn_2 = detections_2["df_conn"]
+df_marq_2 = detections_2["df_marq"]
+df_memoires_2 = detections_2["df_memoires"]
+df_consq_lex_2 = detections_2["df_consq_lex"]
+df_causes_lex_2 = detections_2["df_causes_lex"]
+
+couleur_discours_1 = "#c00000"
+couleur_discours_2 = "#1f4e79"
+libelle_discours_1 = (
+    f"Discours 1 — {nom_discours_1}"
+    if nom_discours_1.strip() and nom_discours_1.strip() != "Discours 1"
+    else "Discours 1"
+)
+libelle_discours_2 = (
+    f"Discours 2 — {nom_discours_2}"
+    if nom_discours_2.strip() and nom_discours_2.strip() != "Discours 2"
+    else "Discours 2"
+)
 
 # Onglets
 (
@@ -1645,6 +1668,16 @@ with tab_stats_norm:
         df_memoires,
         df_consq_lex,
         df_causes_lex,
+        texte_source_2=texte_source_2,
+        df_conn_2=df_conn_2,
+        df_marqueurs_2=df_marq_2,
+        df_memoires_2=df_memoires_2,
+        df_consq_lex_2=df_consq_lex_2,
+        df_causes_lex_2=df_causes_lex_2,
+        heading_discours_1=nom_discours_1,
+        heading_discours_2=nom_discours_2,
+        couleur_discours_1=couleur_discours_1,
+        couleur_discours_2=couleur_discours_2,
     )
 
 with tab_discours:
@@ -1655,12 +1688,10 @@ with tab_discours:
     if not texte_source.strip() and not texte_source_2.strip():
         st.info("Chargez ou saisissez deux discours pour comparer les détections.")
     else:
-        couleur_discours_1 = "#c00000"
-        couleur_discours_2 = "#1f4e79"
         col_a, col_b = st.columns(2)
         with col_a:
             st.markdown(
-                f'<span style="color:{couleur_discours_1}; font-weight:700;">Discours 1</span>',
+                f'<span style="color:{couleur_discours_1}; font-weight:700;">{libelle_discours_1}</span>',
                 unsafe_allow_html=True,
             )
             render_detection_section(
@@ -1673,7 +1704,7 @@ with tab_discours:
 
         with col_b:
             st.markdown(
-                f'<span style="color:{couleur_discours_2}; font-weight:700;">Discours 2</span>',
+                f'<span style="color:{couleur_discours_2}; font-weight:700;">{libelle_discours_2}</span>',
                 unsafe_allow_html=True,
             )
             render_detection_section(
