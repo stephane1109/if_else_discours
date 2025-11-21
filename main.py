@@ -1481,6 +1481,7 @@ with tab_lexique:
 # Onglet 3 : conditions logiques : si/alors
 with tab_conditions:
     st.subheader("Segments conditionnels détectés (SI / ALORS / SINON / TANT QUE)")
+    st.markdown(f"{libelle_discours_1} - sur la base des règle regex (json)")
     if not texte_source.strip():
         st.info("Aucun texte fourni.")
     else:
