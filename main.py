@@ -1034,7 +1034,7 @@ ong1, ong2, ong3, ong4, ong5, ong6, ong_cooc, ong_stats, ong_stats_norm = st.tab
 
 # Onglet 1 : Expressions mappées
 with ong1:
-    st.subheader("Expressions françaises mappées vers une famille conditionnelle (si / alors / sinon / tant que)")
+    st.subheader("Expressions françaises mappées vers des règles conditionnelle (si / alors / sinon / tant que)")
     if not DICO_CONNECTEURS:
         st.info("Aucun connecteur chargé.")
     else:
