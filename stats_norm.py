@@ -127,21 +127,26 @@ def _resultats_par_categorie(
     return resultats
 
 
-def render_stats_norm_tab(
+def _render_stats_norm_block(
     texte_source: str,
     df_conn: pd.DataFrame,
     df_marqueurs: pd.DataFrame,
     df_memoires: pd.DataFrame,
     df_consq_lex: pd.DataFrame,
     df_causes_lex: pd.DataFrame,
+    heading: str,
+    heading_color: str,
 ) -> None:
-    """Affiche les statistiques normalisées dans l'onglet dédié Streamlit."""
-
-    st.subheader("Statistiques normalisées (par 1 000 mots)")
+    """Affiche les statistiques pour un discours donné."""
 
     if not texte_source or not texte_source.strip():
         st.info("Fournissez un texte pour calculer les ratios normalisés.")
         return
+
+    st.markdown(
+        f'<span style="color:{heading_color}; font-weight:700;">{heading}</span>',
+        unsafe_allow_html=True,
+    )
 
     total_mots = _compter_mots(texte_source)
     nb_si = _compter_si(texte_source)
@@ -277,3 +282,80 @@ def render_stats_norm_tab(
         "Les ratios sont calculés en divisant le nombre d’occurrences par le volume total de mots, "
         "puis multipliés par 1 000 pour neutraliser l’effet de longueur du discours."
     )
+
+
+def render_stats_norm_tab(
+    texte_source: str,
+    df_conn: pd.DataFrame,
+    df_marqueurs: pd.DataFrame,
+    df_memoires: pd.DataFrame,
+    df_consq_lex: pd.DataFrame,
+    df_causes_lex: pd.DataFrame,
+    *,
+    texte_source_2: str = "",
+    df_conn_2: pd.DataFrame | None = None,
+    df_marqueurs_2: pd.DataFrame | None = None,
+    df_memoires_2: pd.DataFrame | None = None,
+    df_consq_lex_2: pd.DataFrame | None = None,
+    df_causes_lex_2: pd.DataFrame | None = None,
+    heading_discours_1: str = "Discours 1",
+    heading_discours_2: str = "Discours 2",
+    couleur_discours_1: str = "#c00000",
+    couleur_discours_2: str = "#1f4e79",
+) -> None:
+    """Affiche les statistiques normalisées dans l'onglet dédié Streamlit."""
+
+    st.subheader("Statistiques normalisées (par 1 000 mots)")
+
+    if not texte_source.strip() and not texte_source_2.strip():
+        st.info("Fournissez au moins un texte pour calculer les ratios normalisés.")
+        return
+
+    titre_discours_1 = heading_discours_1.strip() if heading_discours_1 else ""
+    titre_discours_2 = heading_discours_2.strip() if heading_discours_2 else ""
+    label_discours_1 = (
+        f"Discours 1 — {titre_discours_1}"
+        if titre_discours_1 and titre_discours_1 != "Discours 1"
+        else "Discours 1"
+    )
+    label_discours_2 = (
+        f"Discours 2 — {titre_discours_2}"
+        if titre_discours_2 and titre_discours_2 != "Discours 2"
+        else "Discours 2"
+    )
+
+    if texte_source_2 and texte_source_2.strip():
+        col_left, col_right = st.columns(2)
+        with col_left:
+            _render_stats_norm_block(
+                texte_source,
+                df_conn,
+                df_marqueurs,
+                df_memoires,
+                df_consq_lex,
+                df_causes_lex,
+                heading=label_discours_1,
+                heading_color=couleur_discours_1,
+            )
+        with col_right:
+            _render_stats_norm_block(
+                texte_source_2,
+                df_conn_2 if df_conn_2 is not None else pd.DataFrame(),
+                df_marqueurs_2 if df_marqueurs_2 is not None else pd.DataFrame(),
+                df_memoires_2 if df_memoires_2 is not None else pd.DataFrame(),
+                df_consq_lex_2 if df_consq_lex_2 is not None else pd.DataFrame(),
+                df_causes_lex_2 if df_causes_lex_2 is not None else pd.DataFrame(),
+                heading=label_discours_2,
+                heading_color=couleur_discours_2,
+            )
+    else:
+        _render_stats_norm_block(
+            texte_source,
+            df_conn,
+            df_marqueurs,
+            df_memoires,
+            df_consq_lex,
+            df_causes_lex,
+            heading=label_discours_1,
+            heading_color=couleur_discours_1,
+        )
