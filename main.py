@@ -1331,21 +1331,34 @@ df_causes_lex = detections_1["df_causes_lex"]
 df_tensions = detections_1["df_tensions"]
 
 # Onglets
-ong1, ong2, ong3, ong4, ong5, ong6, ong_cooc, ong_stats, ong_stats_norm, ong_discours = st.tabs([
-    "Expressions mappées",
-    "Détections",
-    "Dictionnaires (JSON)",
-    "Lexique",
-    "conditions logiques : si/alors",
-    "Comparatif Regex / spaCy",
-    "Co-occurrences",
-    "Stats",
-    "Stats norm",
-    "2 discours",
-])
+(
+    tab_mapping,
+    tab_detections,
+    tab_conditions,
+    tab_comparatif,
+    tab_cooc,
+    tab_stats,
+    tab_stats_norm,
+    tab_discours,
+    tab_dicos,
+    tab_lexique,
+) = st.tabs(
+    [
+        "Expressions mappées",
+        "Détections",
+        "conditions logiques : si/alors",
+        "Comparatif Regex / spaCy",
+        "Co-occurrences",
+        "Stats",
+        "Stats norm",
+        "2 discours",
+        "Dictionnaires (JSON)",
+        "Lexique",
+    ]
+)
 
 # Onglet 1 : Expressions mappées
-with ong1:
+with tab_mapping:
     st.subheader("Expressions françaises mappées vers des règles conditionnelle (si / alors / sinon / tant que)")
     if not DICO_CONNECTEURS:
         st.info("Aucun connecteur chargé.")
@@ -1359,7 +1372,7 @@ with ong1:
                            key="dl_map_connecteurs_csv")
 
 # Onglet 2 : Détections (listes + texte annoté)
-with ong2:
+with tab_detections:
     render_detection_section(
         texte_source,
         detections_1,
@@ -1367,8 +1380,8 @@ with ong2:
         use_regex_cc=use_regex_cc,
     )
 
-# Onglet 3 : Dictionnaires (JSON)
-with ong3:
+# Onglet Dictionnaires (JSON)
+with tab_dicos:
     st.subheader("Aperçu des dictionnaires chargés (racine)")
     st.markdown("**conditions.json**")
     st.json(DICO_CONDITIONS, expanded=False)
@@ -1383,8 +1396,8 @@ with ong3:
     st.markdown("**souvenirs.json**")
     st.json(DICO_MEMOIRES, expanded=False)
 
-# Onglet 4 : Lexique
-with ong4:
+# Onglet Lexique
+with tab_lexique:
     st.subheader("Lexique : Python et analyse de discours")
 
     st.markdown("#### Lexique des termes clés")
@@ -1441,8 +1454,8 @@ with ong4:
         "- **CAUSE_SUBORDONNEE** : cause formulée par une proposition subordonnée (ex. *parce que*, *puisque*…). Exemple : *Parce qu’il pleuvait, la cérémonie a été déplacée à l’intérieur.*"
     )
 
-# Onglet 5 : conditions logiques : si/alors
-with ong5:
+# Onglet 3 : conditions logiques : si/alors
+with tab_conditions:
     st.subheader("Segments conditionnels détectés (SI / ALORS / SINON / TANT QUE)")
     if not texte_source.strip():
         st.info("Aucun texte fourni.")
@@ -1549,8 +1562,8 @@ with ong5:
                     key="dl_conditions_spacy_csv",
                 )
 
-# Onglet 6 : Comparatif Regex / spaCy
-with ong6:
+# Onglet 4 : Comparatif Regex / spaCy
+with tab_comparatif:
     st.subheader("Comparatif des détections Causes/Conséquences : Regex vs spaCy")
 
     if not texte_source.strip():
@@ -1608,12 +1621,12 @@ with ong6:
         else:
             st.info("spaCy désactivé (voir la barre latérale).")
 
-# Onglet 7 : Co-occurrences
-with ong_cooc:
+# Onglet 5 : Co-occurrences
+with tab_cooc:
     render_cooccurrences_tab(texte_source)
 
-# Onglet 8 : Statistiques sur les marqueurs
-with ong_stats:
+# Onglet 6 : Statistiques sur les marqueurs
+with tab_stats:
     render_stats_tab(
         texte_source,
         df_conn,
@@ -1624,7 +1637,7 @@ with ong_stats:
         df_tensions,
     )
 
-with ong_stats_norm:
+with tab_stats_norm:
     render_stats_norm_tab(
         texte_source,
         df_conn,
@@ -1634,7 +1647,7 @@ with ong_stats_norm:
         df_causes_lex,
     )
 
-with ong_discours:
+with tab_discours:
     st.subheader("Comparaison de deux discours")
     st.markdown(
         "Les analyses affichées ci-dessous reposent sur les détections **Regex** (dictionnaires JSON)."
