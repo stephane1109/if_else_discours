@@ -1585,7 +1585,10 @@ with ong_discours:
     else:
         col_a, col_b = st.columns(2)
         with col_a:
-            st.markdown("**Discours 1**")
+            st.markdown(
+                '<span style="color:#c00000; font-weight:700;">Discours 1</span>',
+                unsafe_allow_html=True,
+            )
             render_detection_section(
                 texte_source,
                 detections_1,
@@ -1594,7 +1597,10 @@ with ong_discours:
             )
 
         with col_b:
-            st.markdown("**Discours 2**")
+            st.markdown(
+                '<span style="color:#c00000; font-weight:700;">Discours 2</span>',
+                unsafe_allow_html=True,
+            )
             render_detection_section(
                 texte_source_2,
                 detections_2,
