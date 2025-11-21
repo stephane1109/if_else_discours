@@ -163,7 +163,7 @@ def _render_stats_norm_block(
     df_memoires: pd.DataFrame,
     df_consq_lex: pd.DataFrame,
     df_causes_lex: pd.DataFrame,
-    df_tensions: pd.DataFrame,
+    df_tensions: pd.DataFrame | None,
     heading: str,
     heading_color: str,
 ) -> None:
@@ -340,7 +340,7 @@ def render_stats_norm_tab(
     df_memoires: pd.DataFrame,
     df_consq_lex: pd.DataFrame,
     df_causes_lex: pd.DataFrame,
-    df_tensions: pd.DataFrame,
+    df_tensions: pd.DataFrame | None,
     *,
     texte_source_2: str = "",
     df_conn_2: pd.DataFrame | None = None,

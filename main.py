@@ -1407,6 +1407,8 @@ with tab_dicos:
     st.json(DICO_CAUSES, expanded=False)
     st.markdown("**souvenirs.json**")
     st.json(DICO_MEMOIRES, expanded=False)
+    st.markdown("**tension_semantique.json**")
+    st.json(DICO_TENSIONS, expanded=False)
 
 # Onglet Expressions mappées
 with tab_mapping:
