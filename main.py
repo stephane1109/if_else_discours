@@ -1343,12 +1343,12 @@ df_causes_lex_2 = detections_2["df_causes_lex"]
 couleur_discours_1 = "#c00000"
 couleur_discours_2 = "#1f4e79"
 libelle_discours_1 = (
-    f"Discours 1 — {nom_discours_1}"
+    f"Discours 1 - {nom_discours_1}"
     if nom_discours_1.strip() and nom_discours_1.strip() != "Discours 1"
     else "Discours 1"
 )
 libelle_discours_2 = (
-    f"Discours 2 — {nom_discours_2}"
+    f"Discours 2 - {nom_discours_2}"
     if nom_discours_2.strip() and nom_discours_2.strip() != "Discours 2"
     else "Discours 2"
 )
@@ -1396,6 +1396,7 @@ with tab_mapping:
 
 # Onglet 2 : Détections (listes + texte annoté)
 with tab_detections:
+    st.markdown(f"### {libelle_discours_1}")
     render_detection_section(
         texte_source,
         detections_1,
