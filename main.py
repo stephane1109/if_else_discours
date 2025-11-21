@@ -647,6 +647,7 @@ def render_detection_section(
     detections: Dict[str, pd.DataFrame],
     key_prefix: str = "",
     use_regex_cc: bool = True,
+    heading_color: Optional[str] = None,
 ):
     """Affiche les résultats de détection pour un texte (onglet Détection)."""
 
@@ -657,7 +658,16 @@ def render_detection_section(
     df_causes_lex = detections.get("df_causes_lex", pd.DataFrame())
     df_tensions = detections.get("df_tensions", pd.DataFrame())
 
-    st.subheader("Connecteurs détectés")
+    def _subheader(titre: str) -> None:
+        if heading_color:
+            st.markdown(
+                f"<span style=\"color:{heading_color}; font-size:1.25rem; font-weight:700;\">{html.escape(titre)}</span>",
+                unsafe_allow_html=True,
+            )
+        else:
+            st.subheader(titre)
+
+    _subheader("Connecteurs détectés")
     if df_conn.empty:
         st.info("Aucun connecteur détecté ou aucun texte fourni.")
     else:
@@ -670,7 +680,7 @@ def render_detection_section(
             key=f"{key_prefix}dl_occ_conn_csv",
         )
 
-    st.subheader("Marqueurs détectés")
+    _subheader("Marqueurs détectés")
     if df_marq.empty:
         st.info("Aucun marqueur détecté.")
     else:
@@ -683,7 +693,7 @@ def render_detection_section(
             key=f"{key_prefix}dl_occ_marq_csv",
         )
 
-    st.subheader("Tensions sémantiques détectées")
+    _subheader("Tensions sémantiques détectées")
     if not DICO_TENSIONS:
         st.info("Aucun dictionnaire de tensions sémantiques chargé.")
     elif df_tensions.empty:
@@ -698,7 +708,7 @@ def render_detection_section(
             key=f"{key_prefix}dl_occ_tensions_csv",
         )
 
-    st.subheader("Marqueurs mémoire détectés")
+    _subheader("Marqueurs mémoire détectés")
     if df_memoires.empty:
         st.info("Aucun marqueur mémoire détecté.")
     else:
@@ -713,7 +723,7 @@ def render_detection_section(
 
     colX, colY = st.columns(2)
     with colX:
-        st.subheader("Déclencheurs de conséquence (Regex)")
+        _subheader("Déclencheurs de conséquence (Regex)")
         if not use_regex_cc:
             st.info("Méthode Regex désactivée (voir barre latérale).")
         elif df_consq_lex.empty:
@@ -728,7 +738,7 @@ def render_detection_section(
                 key=f"{key_prefix}dl_occ_consq_csv",
             )
     with colY:
-        st.subheader("Déclencheurs de cause (Regex)")
+        _subheader("Déclencheurs de cause (Regex)")
         if not use_regex_cc:
             st.info("Méthode Regex désactivée (voir barre latérale).")
         elif df_causes_lex.empty:
@@ -744,7 +754,7 @@ def render_detection_section(
             )
 
     st.markdown("---")
-    st.subheader("Texte annoté")
+    _subheader("Texte annoté")
 
     codes_disponibles = sorted({str(v).upper() for v in DICO_CONNECTEURS.values()})
     show_codes: Dict[str, bool] = {}
@@ -1626,13 +1636,18 @@ with ong_stats_norm:
 
 with ong_discours:
     st.subheader("Comparaison de deux discours")
+    st.markdown(
+        "Les analyses affichées ci-dessous reposent sur les détections **Regex** (dictionnaires JSON)."
+    )
     if not texte_source.strip() and not texte_source_2.strip():
         st.info("Chargez ou saisissez deux discours pour comparer les détections.")
     else:
+        couleur_discours_1 = "#c00000"
+        couleur_discours_2 = "#1f4e79"
         col_a, col_b = st.columns(2)
         with col_a:
             st.markdown(
-                '<span style="color:#c00000; font-weight:700;">Discours 1</span>',
+                f'<span style="color:{couleur_discours_1}; font-weight:700;">Discours 1</span>',
                 unsafe_allow_html=True,
             )
             render_detection_section(
@@ -1640,11 +1655,12 @@ with ong_discours:
                 detections_1,
                 key_prefix="disc1_compare_",
                 use_regex_cc=use_regex_cc,
+                heading_color=couleur_discours_1,
             )
 
         with col_b:
             st.markdown(
-                '<span style="color:#c00000; font-weight:700;">Discours 2</span>',
+                f'<span style="color:{couleur_discours_2}; font-weight:700;">Discours 2</span>',
                 unsafe_allow_html=True,
             )
             render_detection_section(
@@ -1652,4 +1668,5 @@ with ong_discours:
                 detections_2,
                 key_prefix="disc2_compare_",
                 use_regex_cc=use_regex_cc,
+                heading_color=couleur_discours_2,
             )
