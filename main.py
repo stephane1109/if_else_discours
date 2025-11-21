@@ -1339,6 +1339,7 @@ df_marq_2 = detections_2["df_marq"]
 df_memoires_2 = detections_2["df_memoires"]
 df_consq_lex_2 = detections_2["df_consq_lex"]
 df_causes_lex_2 = detections_2["df_causes_lex"]
+df_tensions_2 = detections_2["df_tensions"]
 
 couleur_discours_1 = "#c00000"
 couleur_discours_2 = "#1f4e79"
@@ -1675,12 +1676,14 @@ with tab_stats_norm:
         df_memoires,
         df_consq_lex,
         df_causes_lex,
+        df_tensions,
         texte_source_2=texte_source_2,
         df_conn_2=df_conn_2,
         df_marqueurs_2=df_marq_2,
         df_memoires_2=df_memoires_2,
         df_consq_lex_2=df_consq_lex_2,
         df_causes_lex_2=df_causes_lex_2,
+        df_tensions_2=df_tensions_2,
         heading_discours_1=nom_discours_1,
         heading_discours_2=nom_discours_2,
         couleur_discours_1=couleur_discours_1,

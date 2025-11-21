@@ -153,6 +153,7 @@ def _render_stats_norm_block(
     df_memoires: pd.DataFrame,
     df_consq_lex: pd.DataFrame,
     df_causes_lex: pd.DataFrame,
+    df_tensions: pd.DataFrame,
     heading: str,
     heading_color: str,
 ) -> None:
@@ -182,6 +183,7 @@ def _render_stats_norm_block(
     serie_memoires = _series_depuis_df(df_memoires, "categorie")
     serie_consq = _series_depuis_df(df_consq_lex, "categorie")
     serie_causes = _series_depuis_df(df_causes_lex, "categorie")
+    serie_tensions = _series_depuis_df(df_tensions, "tension")
 
     col1, col2 = st.columns(2)
     col1.metric("Longueur du texte (mots)", f"{total_mots}")
@@ -290,6 +292,19 @@ def _render_stats_norm_block(
         )
     )
 
+    sections.append(
+        (
+            "Tensions sémantiques",
+            _resultats_par_categorie(
+                serie_tensions,
+                total_mots,
+                "Tension",
+                ajouter_total=True,
+                format_categorie=pretty_label,
+            ),
+        )
+    )
+
     for titre, resultats in sections:
         st.markdown(
             f'<span style="color:{couleur_titre}; font-weight:700; font-size:1.2rem;">{titre}</span>',
@@ -315,6 +330,7 @@ def render_stats_norm_tab(
     df_memoires: pd.DataFrame,
     df_consq_lex: pd.DataFrame,
     df_causes_lex: pd.DataFrame,
+    df_tensions: pd.DataFrame,
     *,
     texte_source_2: str = "",
     df_conn_2: pd.DataFrame | None = None,
@@ -322,6 +338,7 @@ def render_stats_norm_tab(
     df_memoires_2: pd.DataFrame | None = None,
     df_consq_lex_2: pd.DataFrame | None = None,
     df_causes_lex_2: pd.DataFrame | None = None,
+    df_tensions_2: pd.DataFrame | None = None,
     heading_discours_1: str = "Discours 1",
     heading_discours_2: str = "Discours 2",
     couleur_discours_1: str = "#c00000",
@@ -361,6 +378,7 @@ def render_stats_norm_tab(
                 df_memoires,
                 df_consq_lex,
                 df_causes_lex,
+                df_tensions,
                 heading=label_discours_1,
                 heading_color=couleur_discours_1,
             )
@@ -372,6 +390,7 @@ def render_stats_norm_tab(
                 df_memoires_2 if df_memoires_2 is not None else pd.DataFrame(),
                 df_consq_lex_2 if df_consq_lex_2 is not None else pd.DataFrame(),
                 df_causes_lex_2 if df_causes_lex_2 is not None else pd.DataFrame(),
+                df_tensions_2 if df_tensions_2 is not None else pd.DataFrame(),
                 heading=label_discours_2,
                 heading_color=couleur_discours_2,
             )
@@ -383,6 +402,7 @@ def render_stats_norm_tab(
             df_memoires,
             df_consq_lex,
             df_causes_lex,
+            df_tensions,
             heading=label_discours_1,
             heading_color=couleur_discours_1,
         )
