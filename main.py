@@ -1423,8 +1423,6 @@ with tab_mapping:
 
 # Onglet Lexique
 with tab_lexique:
-    st.subheader("Lexique : Python et analyse de discours")
-
     st.markdown("#### Lexique des termes clés")
     st.markdown(
         "- **APODOSE** : Proposition principale qui, placée après une subordonnée conditionnelle (protase), en indique la conséquence. Exemple : *Si j’insiste* (protase), *il viendra* (apodose)."
