@@ -21,6 +21,7 @@
   "au cas où": "CONDITION",
   "au cas ou": "CONDITION",
   "sous certaines conditions": "CONDITION",
+  "tant que": "WHILE",
 
   "alors": "ALORS",
   "donc": "ALORS",
