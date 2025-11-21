@@ -127,6 +127,25 @@ def _resultats_par_categorie(
     return resultats
 
 
+def _normaliser_couleur(choix: str, valeur_par_defaut: str) -> str:
+    """Restreint les couleurs aux variantes rouge ou bleu pour les titres."""
+
+    if not choix:
+        return valeur_par_defaut
+
+    choix_min = choix.strip().lower()
+    couleurs_autorisees = {
+        "rouge": "#c00000",
+        "red": "#c00000",
+        "bleu": "#1f4e79",
+        "blue": "#1f4e79",
+        "#c00000": "#c00000",
+        "#1f4e79": "#1f4e79",
+    }
+
+    return couleurs_autorisees.get(choix_min, valeur_par_defaut)
+
+
 def _render_stats_norm_block(
     texte_source: str,
     df_conn: pd.DataFrame,
@@ -143,8 +162,10 @@ def _render_stats_norm_block(
         st.info("Fournissez un texte pour calculer les ratios normalisés.")
         return
 
+    couleur_titre = _normaliser_couleur(heading_color, heading_color or "#c00000")
+
     st.markdown(
-        f'<span style="color:{heading_color}; font-weight:700;">{heading}</span>',
+        f'<span style="color:{couleur_titre}; font-weight:700;">{heading}</span>',
         unsafe_allow_html=True,
     )
 
@@ -270,7 +291,10 @@ def _render_stats_norm_block(
     )
 
     for titre, resultats in sections:
-        st.markdown(f"#### {titre}")
+        st.markdown(
+            f'<span style="color:{couleur_titre}; font-weight:700; font-size:1.2rem;">{titre}</span>',
+            unsafe_allow_html=True,
+        )
         if not resultats:
             st.info("Aucune donnée disponible pour cette section.")
             continue
@@ -302,10 +326,13 @@ def render_stats_norm_tab(
     heading_discours_2: str = "Discours 2",
     couleur_discours_1: str = "#c00000",
     couleur_discours_2: str = "#1f4e79",
-) -> None:
+    ) -> None:
     """Affiche les statistiques normalisées dans l'onglet dédié Streamlit."""
 
     st.subheader("Statistiques normalisées (par 1 000 mots)")
+    st.caption(
+        "Les stats sont normalisées sur la base des expressions/dictionnaires JSON (sans Spacy)."
+    )
 
     if not texte_source.strip() and not texte_source_2.strip():
         st.info("Fournissez au moins un texte pour calculer les ratios normalisés.")
