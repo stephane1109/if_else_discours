@@ -67,19 +67,29 @@ def _fabrique_tableau(resultats: list[RatioResult]) -> pd.DataFrame:
 
 
 def _series_depuis_df(df: pd.DataFrame | None, colonne: str) -> pd.Series:
-    """Retourne une série nettoyée (chaînes en majuscules) pour la colonne ciblée."""
+    """Retourne une série nettoyée (chaînes en majuscules) pour la colonne ciblée.
 
-    if df is None or df.empty or colonne not in df.columns:
+    La fonction est tolérante aux entrées inattendues (par exemple un dictionnaire
+    ou une liste) afin d'éviter les erreurs de type lorsque les nouvelles
+    détections ne sont pas encore mises au bon format DataFrame.
+    """
+
+    if not isinstance(df, pd.DataFrame) or df.empty or colonne not in df.columns:
         return pd.Series(dtype="string")
 
-    serie = (
-        df[colonne]
-        .dropna()
-        .astype(str)
-        .str.strip()
-        .replace("", pd.NA)
-        .dropna()
-    )
+    try:
+        serie = (
+            df[colonne]
+            .dropna()
+            .astype(str)
+            .str.strip()
+            .replace("", pd.NA)
+            .dropna()
+        )
+    except Exception:
+        # Si la colonne contient des valeurs non convertibles, on retourne
+        # une série vide pour préserver l'affichage global.
+        return pd.Series(dtype="string")
 
     if serie.empty:
         return pd.Series(dtype="string")
