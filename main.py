@@ -631,6 +631,13 @@ def html_annote(texte: str,
         return "<div class='texte-annote'>(Aucune annotation selon les cases sélectionnées)</div>"
     return "<div class='texte-annote'>" + "".join(morceaux) + "</div>"
 
+
+def toggle_checkboxes(prefix: str, options_keys: List[str], value: bool) -> None:
+    """Force un ensemble de cases à cocher Streamlit à True/False via st.session_state."""
+    for opt in options_keys:
+        key = f"{prefix}{opt}"
+        st.session_state[key] = value
+
 def html_autonome(fragment_html: str) -> str:
     return f"<!DOCTYPE html><html lang='fr'><head><meta charset='utf-8'/><title>Texte annoté</title>{css_badges()}</head><body>{fragment_html}</body></html>"
 
@@ -743,11 +750,24 @@ def render_detection_section(
     show_codes: Dict[str, bool] = {}
     if codes_disponibles:
         st.markdown("**Familles de connecteurs**")
+        col_all, col_none = st.columns(2)
+        activer_conn = col_all.button(
+            "Tout cocher (connecteurs)", key=f"{key_prefix}btn_conn_all"
+        )
+        desactiver_conn = col_none.button(
+            "Tout décocher (connecteurs)", key=f"{key_prefix}btn_conn_none"
+        )
+        if activer_conn or desactiver_conn:
+            toggle_checkboxes(
+                f"{key_prefix}chk_code_",
+                [code.lower() for code in codes_disponibles],
+                activer_conn,
+            )
         for code in codes_disponibles:
             label = LIBELLES_CODES.get(code, code)
             show_codes[code] = st.checkbox(
                 label,
-                value=True,
+                value=st.session_state.get(f"{key_prefix}chk_code_{code.lower()}", True),
                 key=f"{key_prefix}chk_code_{code.lower()}",
             )
 
@@ -755,11 +775,24 @@ def render_detection_section(
     show_marqueurs_categories: Dict[str, bool] = {}
     if categories_normatives:
         st.markdown("**Marqueurs normatifs**")
+        col_all, col_none = st.columns(2)
+        activer_marqueurs = col_all.button(
+            "Tout cocher (marqueurs)", key=f"{key_prefix}btn_marqueur_all"
+        )
+        desactiver_marqueurs = col_none.button(
+            "Tout décocher (marqueurs)", key=f"{key_prefix}btn_marqueur_none"
+        )
+        if activer_marqueurs or desactiver_marqueurs:
+            toggle_checkboxes(
+                f"{key_prefix}chk_marqueur_",
+                [cat.lower() for cat in categories_normatives],
+                activer_marqueurs,
+            )
         for cat in categories_normatives:
             label = cat.replace("_", " ")
             show_marqueurs_categories[cat] = st.checkbox(
                 label,
-                value=True,
+                value=st.session_state.get(f"{key_prefix}chk_marqueur_{cat.lower()}", True),
                 key=f"{key_prefix}chk_marqueur_{cat.lower()}",
             )
     else:
@@ -769,11 +802,24 @@ def render_detection_section(
     show_memoires_categories: Dict[str, bool] = {}
     if categories_memoires:
         st.markdown("**Marqueurs mémoire**")
+        col_all, col_none = st.columns(2)
+        activer_memoires = col_all.button(
+            "Tout cocher (mémoire)", key=f"{key_prefix}btn_memoire_all"
+        )
+        desactiver_memoires = col_none.button(
+            "Tout décocher (mémoire)", key=f"{key_prefix}btn_memoire_none"
+        )
+        if activer_memoires or desactiver_memoires:
+            toggle_checkboxes(
+                f"{key_prefix}chk_memoire_",
+                [cat.lower() for cat in categories_memoires],
+                activer_memoires,
+            )
         for cat in categories_memoires:
             label = cat.replace("_", " ")
             show_memoires_categories[cat] = st.checkbox(
                 label,
-                value=True,
+                value=st.session_state.get(f"{key_prefix}chk_memoire_{cat.lower()}", True),
                 key=f"{key_prefix}chk_memoire_{cat.lower()}",
             )
     else:
