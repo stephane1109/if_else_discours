@@ -209,6 +209,42 @@ def _trouver_occurrences_motifs(texte: str, motifs: List[Tuple[str, re.Pattern]]
     occurrences.sort(key=lambda occ: occ["start"])
     return occurrences
 
+
+def preparer_detections(texte_source: str, use_regex_cc: bool) -> Dict[str, pd.DataFrame]:
+    """Retourne l'ensemble des DataFrames de détection pour un texte donné."""
+    if texte_source.strip():
+        df_conn = detecter_connecteurs(texte_source, DICO_CONNECTEURS)
+        df_marq_brut = detecter_marqueurs(texte_source, DICO_MARQUEURS)
+        df_marq = ajuster_negations_global(texte_source, df_marq_brut)
+        df_memoires = detecter_memoires(texte_source, DICO_MEMOIRES)
+        df_consq_lex = (
+            detecter_consequences_lex(texte_source, DICO_CONSQS)
+            if use_regex_cc
+            else pd.DataFrame()
+        )
+        df_causes_lex = (
+            detecter_causes_lex(texte_source, DICO_CAUSES)
+            if use_regex_cc
+            else pd.DataFrame()
+        )
+        df_tensions = detecter_tensions_semantiques(texte_source, DICO_TENSIONS)
+    else:
+        df_conn = pd.DataFrame()
+        df_marq = pd.DataFrame()
+        df_memoires = pd.DataFrame()
+        df_consq_lex = pd.DataFrame()
+        df_causes_lex = pd.DataFrame()
+        df_tensions = pd.DataFrame()
+
+    return {
+        "df_conn": df_conn,
+        "df_marq": df_marq,
+        "df_memoires": df_memoires,
+        "df_consq_lex": df_consq_lex,
+        "df_causes_lex": df_causes_lex,
+        "df_tensions": df_tensions,
+    }
+
 def _premier_match_motifs(
     texte: str,
     motifs: List[Tuple[str, re.Pattern]],
@@ -597,6 +633,199 @@ def html_annote(texte: str,
 
 def html_autonome(fragment_html: str) -> str:
     return f"<!DOCTYPE html><html lang='fr'><head><meta charset='utf-8'/><title>Texte annoté</title>{css_badges()}</head><body>{fragment_html}</body></html>"
+
+
+def render_detection_section(
+    texte_source: str,
+    detections: Dict[str, pd.DataFrame],
+    key_prefix: str = "",
+    use_regex_cc: bool = True,
+):
+    """Affiche les résultats de détection pour un texte (onglet Détection)."""
+
+    df_conn = detections.get("df_conn", pd.DataFrame())
+    df_marq = detections.get("df_marq", pd.DataFrame())
+    df_memoires = detections.get("df_memoires", pd.DataFrame())
+    df_consq_lex = detections.get("df_consq_lex", pd.DataFrame())
+    df_causes_lex = detections.get("df_causes_lex", pd.DataFrame())
+    df_tensions = detections.get("df_tensions", pd.DataFrame())
+
+    st.subheader("Connecteurs détectés")
+    if df_conn.empty:
+        st.info("Aucun connecteur détecté ou aucun texte fourni.")
+    else:
+        st.dataframe(df_conn, use_container_width=True, hide_index=True)
+        st.download_button(
+            "Exporter connecteurs (CSV)",
+            data=df_conn.to_csv(index=False).encode("utf-8"),
+            file_name="occurrences_connecteurs.csv",
+            mime="text/csv",
+            key=f"{key_prefix}dl_occ_conn_csv",
+        )
+
+    st.subheader("Marqueurs détectés")
+    if df_marq.empty:
+        st.info("Aucun marqueur détecté.")
+    else:
+        st.dataframe(df_marq, use_container_width=True, hide_index=True)
+        st.download_button(
+            "Exporter marqueurs (CSV)",
+            data=df_marq.to_csv(index=False).encode("utf-8"),
+            file_name="occurrences_marqueurs.csv",
+            mime="text/csv",
+            key=f"{key_prefix}dl_occ_marq_csv",
+        )
+
+    st.subheader("Tensions sémantiques détectées")
+    if not DICO_TENSIONS:
+        st.info("Aucun dictionnaire de tensions sémantiques chargé.")
+    elif df_tensions.empty:
+        st.info("Aucune tension sémantique détectée dans le texte.")
+    else:
+        st.dataframe(df_tensions, use_container_width=True, hide_index=True)
+        st.download_button(
+            "Exporter tensions sémantiques (CSV)",
+            data=df_tensions.to_csv(index=False).encode("utf-8"),
+            file_name="tensions_semantiques.csv",
+            mime="text/csv",
+            key=f"{key_prefix}dl_occ_tensions_csv",
+        )
+
+    st.subheader("Marqueurs mémoire détectés")
+    if df_memoires.empty:
+        st.info("Aucun marqueur mémoire détecté.")
+    else:
+        st.dataframe(df_memoires, use_container_width=True, hide_index=True)
+        st.download_button(
+            "Exporter marqueurs mémoire (CSV)",
+            data=df_memoires.to_csv(index=False).encode("utf-8"),
+            file_name="occurrences_memoires.csv",
+            mime="text/csv",
+            key=f"{key_prefix}dl_occ_memoires_csv",
+        )
+
+    colX, colY = st.columns(2)
+    with colX:
+        st.subheader("Déclencheurs de conséquence (Regex)")
+        if not use_regex_cc:
+            st.info("Méthode Regex désactivée (voir barre latérale).")
+        elif df_consq_lex.empty:
+            st.info("Aucun déclencheur de conséquence détecté par Regex.")
+        else:
+            st.dataframe(df_consq_lex, use_container_width=True, hide_index=True)
+            st.download_button(
+                "Exporter conséquences (CSV)",
+                data=df_consq_lex.to_csv(index=False).encode("utf-8"),
+                file_name="occurrences_consequences.csv",
+                mime="text/csv",
+                key=f"{key_prefix}dl_occ_consq_csv",
+            )
+    with colY:
+        st.subheader("Déclencheurs de cause (Regex)")
+        if not use_regex_cc:
+            st.info("Méthode Regex désactivée (voir barre latérale).")
+        elif df_causes_lex.empty:
+            st.info("Aucun déclencheur de cause détecté par Regex.")
+        else:
+            st.dataframe(df_causes_lex, use_container_width=True, hide_index=True)
+            st.download_button(
+                "Exporter causes (CSV)",
+                data=df_causes_lex.to_csv(index=False).encode("utf-8"),
+                file_name="occurrences_causes.csv",
+                mime="text/csv",
+                key=f"{key_prefix}dl_occ_causes_csv",
+            )
+
+    st.markdown("---")
+    st.subheader("Texte annoté")
+
+    codes_disponibles = sorted({str(v).upper() for v in DICO_CONNECTEURS.values()})
+    show_codes: Dict[str, bool] = {}
+    if codes_disponibles:
+        st.markdown("**Familles de connecteurs**")
+        for code in codes_disponibles:
+            label = LIBELLES_CODES.get(code, code)
+            show_codes[code] = st.checkbox(
+                label,
+                value=True,
+                key=f"{key_prefix}chk_code_{code.lower()}",
+            )
+
+    categories_normatives = sorted({str(v).upper() for v in DICO_MARQUEURS.values()})
+    show_marqueurs_categories: Dict[str, bool] = {}
+    if categories_normatives:
+        st.markdown("**Marqueurs normatifs**")
+        for cat in categories_normatives:
+            label = cat.replace("_", " ")
+            show_marqueurs_categories[cat] = st.checkbox(
+                label,
+                value=True,
+                key=f"{key_prefix}chk_marqueur_{cat.lower()}",
+            )
+    else:
+        show_marqueurs_categories = None
+
+    categories_memoires = sorted({str(v).upper() for v in DICO_MEMOIRES.values()})
+    show_memoires_categories: Dict[str, bool] = {}
+    if categories_memoires:
+        st.markdown("**Marqueurs mémoire**")
+        for cat in categories_memoires:
+            label = cat.replace("_", " ")
+            show_memoires_categories[cat] = st.checkbox(
+                label,
+                value=True,
+                key=f"{key_prefix}chk_memoire_{cat.lower()}",
+            )
+    else:
+        show_memoires_categories = None
+
+    categories_tensions = sorted({str(v).upper() for v in DICO_TENSIONS.values()})
+    show_tensions_categories: Optional[Dict[str, bool]] = None
+    if categories_tensions:
+        st.markdown("**Tensions sémantiques**")
+        show_tensions = st.checkbox(
+            "Afficher les tensions sémantiques",
+            value=True,
+            key=f"{key_prefix}chk_tensions_global",
+        )
+    else:
+        show_tensions = False
+
+    st.markdown("**Marqueurs de causalité**")
+    show_consequences = st.checkbox(
+        "CONSEQUENCE", value=True, key=f"{key_prefix}chk_consequence"
+    )
+    show_causes = st.checkbox("CAUSE", value=True, key=f"{key_prefix}chk_cause")
+
+    st.markdown(css_badges(), unsafe_allow_html=True)
+    if not texte_source.strip():
+        st.info("Aucun texte fourni.")
+        frag = "<div class='texte-annote'>(Texte vide)</div>"
+    else:
+        frag = html_annote(
+            texte_source,
+            DICO_CONNECTEURS,
+            DICO_MARQUEURS,
+            DICO_MEMOIRES,
+            DICO_CONSQS if show_consequences else {},
+            DICO_CAUSES if show_causes else {},
+            DICO_TENSIONS if show_tensions else {},
+            show_codes=show_codes,
+            show_marqueurs_categories=show_marqueurs_categories,
+            show_memoires_categories=show_memoires_categories,
+            show_tensions_categories=show_tensions_categories,
+            show_consequences=show_consequences,
+            show_causes=show_causes,
+            show_tensions=show_tensions,
+        )
+        st.markdown(frag, unsafe_allow_html=True)
+        st.download_button(
+            "Exporter le texte annoté (HTML)",
+            data=html_autonome(frag).encode("utf-8"),
+            file_name="texte_annote.html",
+            mime="text/html",
+            key=f"{key_prefix}dl_annote_html",
+        )
 
 # =========================
 # Extraction graphes WHILE / IF (heuristiques)
@@ -989,38 +1218,64 @@ st.markdown("### Source du discours")
 mode_source = st.radio("Choisir la source du texte", ["Fichier .txt", "Zone de texte"], index=0, horizontal=True)
 
 texte_source = ""
+texte_source_2 = ""
 if mode_source == "Fichier .txt":
-    fichier_txt = st.file_uploader("Déposer un fichier texte (.txt)", type=["txt"], accept_multiple_files=False, key="discours_txt")
+    fichier_txt = st.file_uploader(
+        "Déposer un fichier texte (.txt)",
+        type=["txt"],
+        accept_multiple_files=False,
+        key="discours_txt",
+    )
+    fichier_txt_2 = st.file_uploader(
+        "Déposer un deuxième fichier texte (.txt) pour comparer",
+        type=["txt"],
+        accept_multiple_files=False,
+        key="discours_txt_2",
+    )
     if fichier_txt is not None:
         try:
             texte_source = lire_fichier_txt(fichier_txt)
-            st.success(f"Fichier chargé : {fichier_txt.name} • {len(texte_source)} caractères")
+            st.success(
+                f"Fichier chargé : {fichier_txt.name} • {len(texte_source)} caractères"
+            )
         except Exception as e:
             st.error(f"Impossible de lire le fichier : {e}")
+    if fichier_txt_2 is not None:
+        try:
+            texte_source_2 = lire_fichier_txt(fichier_txt_2)
+            st.success(
+                f"Second fichier chargé : {fichier_txt_2.name} • {len(texte_source_2)} caractères"
+            )
+        except Exception as e:
+            st.error(f"Impossible de lire le deuxième fichier : {e}")
 else:
-    texte_source = st.text_area("Saisir ou coller le discours :", value="", height=240, placeholder="Coller ici le discours à analyser…")
+    texte_source = st.text_area(
+        "Saisir ou coller le discours :",
+        value="",
+        height=240,
+        placeholder="Coller ici le discours à analyser…",
+    )
+    texte_source_2 = st.text_area(
+        "(Optionnel) Saisir ou coller un deuxième discours :",
+        value="",
+        height=240,
+        placeholder="Coller ici le deuxième discours à comparer…",
+    )
 
 st.divider()
 
 # Détections de base
-if texte_source.strip():
-    df_conn = detecter_connecteurs(texte_source, DICO_CONNECTEURS)
-    df_marq_brut = detecter_marqueurs(texte_source, DICO_MARQUEURS)
-    df_marq = ajuster_negations_global(texte_source, df_marq_brut)
-    df_memoires = detecter_memoires(texte_source, DICO_MEMOIRES)
-    df_consq_lex = detecter_consequences_lex(texte_source, DICO_CONSQS) if use_regex_cc else pd.DataFrame()
-    df_causes_lex = detecter_causes_lex(texte_source, DICO_CAUSES) if use_regex_cc else pd.DataFrame()
-    df_tensions = detecter_tensions_semantiques(texte_source, DICO_TENSIONS)
-else:
-    df_conn = pd.DataFrame()
-    df_marq = pd.DataFrame()
-    df_memoires = pd.DataFrame()
-    df_consq_lex = pd.DataFrame()
-    df_causes_lex = pd.DataFrame()
-    df_tensions = pd.DataFrame()
+detections_1 = preparer_detections(texte_source, use_regex_cc)
+detections_2 = preparer_detections(texte_source_2, use_regex_cc)
+df_conn = detections_1["df_conn"]
+df_marq = detections_1["df_marq"]
+df_memoires = detections_1["df_memoires"]
+df_consq_lex = detections_1["df_consq_lex"]
+df_causes_lex = detections_1["df_causes_lex"]
+df_tensions = detections_1["df_tensions"]
 
 # Onglets
-ong1, ong2, ong3, ong4, ong5, ong6, ong_cooc, ong_stats, ong_stats_norm = st.tabs([
+ong1, ong2, ong3, ong4, ong5, ong6, ong_cooc, ong_stats, ong_stats_norm, ong_discours = st.tabs([
     "Expressions mappées",
     "Détections",
     "Dictionnaires (JSON)",
@@ -1030,6 +1285,7 @@ ong1, ong2, ong3, ong4, ong5, ong6, ong_cooc, ong_stats, ong_stats_norm = st.tab
     "Co-occurrences",
     "Stats",
     "Stats norm",
+    "2 discours",
 ])
 
 # Onglet 1 : Expressions mappées
@@ -1048,161 +1304,12 @@ with ong1:
 
 # Onglet 2 : Détections (listes + texte annoté)
 with ong2:
-    st.subheader("Connecteurs détectés")
-    if df_conn.empty:
-        st.info("Aucun connecteur détecté ou aucun texte fourni.")
-    else:
-        st.dataframe(df_conn, use_container_width=True, hide_index=True)
-        st.download_button("Exporter connecteurs (CSV)",
-                           data=df_conn.to_csv(index=False).encode("utf-8"),
-                           file_name="occurrences_connecteurs.csv", mime="text/csv",
-                           key="dl_occ_conn_csv")
-
-    st.subheader("Marqueurs détectés")
-    if df_marq.empty:
-        st.info("Aucun marqueur détecté.")
-    else:
-        st.dataframe(df_marq, use_container_width=True, hide_index=True)
-        st.download_button("Exporter marqueurs (CSV)",
-                           data=df_marq.to_csv(index=False).encode("utf-8"),
-                           file_name="occurrences_marqueurs.csv", mime="text/csv",
-                           key="dl_occ_marq_csv")
-
-    st.subheader("Tensions sémantiques détectées")
-    if not DICO_TENSIONS:
-        st.info("Aucun dictionnaire de tensions sémantiques chargé.")
-    elif df_tensions.empty:
-        st.info("Aucune tension sémantique détectée dans le texte.")
-    else:
-        st.dataframe(df_tensions, use_container_width=True, hide_index=True)
-        st.download_button(
-            "Exporter tensions sémantiques (CSV)",
-            data=df_tensions.to_csv(index=False).encode("utf-8"),
-            file_name="tensions_semantiques.csv",
-            mime="text/csv",
-            key="dl_occ_tensions_csv",
-        )
-
-    st.subheader("Marqueurs mémoire détectés")
-    if df_memoires.empty:
-        st.info("Aucun marqueur mémoire détecté.")
-    else:
-        st.dataframe(df_memoires, use_container_width=True, hide_index=True)
-        st.download_button("Exporter marqueurs mémoire (CSV)",
-                           data=df_memoires.to_csv(index=False).encode("utf-8"),
-                           file_name="occurrences_memoires.csv", mime="text/csv",
-                           key="dl_occ_memoires_csv")
-
-    colX, colY = st.columns(2)
-    with colX:
-        st.subheader("Déclencheurs de conséquence (Regex)")
-        if not use_regex_cc:
-            st.info("Méthode Regex désactivée (voir barre latérale).")
-        else:
-            if df_consq_lex.empty:
-                st.info("Aucun déclencheur de conséquence détecté par Regex.")
-            else:
-                st.dataframe(df_consq_lex, use_container_width=True, hide_index=True)
-                st.download_button("Exporter conséquences (CSV)",
-                                   data=df_consq_lex.to_csv(index=False).encode("utf-8"),
-                                   file_name="occurrences_consequences.csv", mime="text/csv",
-                                   key="dl_occ_consq_csv")
-    with colY:
-        st.subheader("Déclencheurs de cause (Regex)")
-        if not use_regex_cc:
-            st.info("Méthode Regex désactivée (voir barre latérale).")
-        else:
-            if df_causes_lex.empty:
-                st.info("Aucun déclencheur de cause détecté par Regex.")
-            else:
-                st.dataframe(df_causes_lex, use_container_width=True, hide_index=True)
-                st.download_button("Exporter causes (CSV)",
-                                   data=df_causes_lex.to_csv(index=False).encode("utf-8"),
-                                   file_name="occurrences_causes.csv", mime="text/csv",
-                                   key="dl_occ_causes_csv")
-
-    st.markdown("---")
-    st.subheader("Texte annoté")
-
-    # Cases à cocher pour les familles de connecteurs et marqueurs
-    codes_disponibles = sorted({str(v).upper() for v in DICO_CONNECTEURS.values()})
-    show_codes: Dict[str, bool] = {}
-    if codes_disponibles:
-        st.markdown("**Familles de connecteurs**")
-        for code in codes_disponibles:
-            label = LIBELLES_CODES.get(code, code)
-            show_codes[code] = st.checkbox(label, value=True, key=f"chk_code_{code.lower()}")
-
-    categories_normatives = sorted({str(v).upper() for v in DICO_MARQUEURS.values()})
-    show_marqueurs_categories: Dict[str, bool] = {}
-    if categories_normatives:
-        st.markdown("**Marqueurs normatifs**")
-        for cat in categories_normatives:
-            label = cat.replace("_", " ")
-            show_marqueurs_categories[cat] = st.checkbox(
-                label,
-                value=True,
-                key=f"chk_marqueur_{cat.lower()}"
-            )
-    else:
-        show_marqueurs_categories = None
-
-    categories_memoires = sorted({str(v).upper() for v in DICO_MEMOIRES.values()})
-    show_memoires_categories: Dict[str, bool] = {}
-    if categories_memoires:
-        st.markdown("**Marqueurs mémoire**")
-        for cat in categories_memoires:
-            label = cat.replace("_", " ")
-            show_memoires_categories[cat] = st.checkbox(
-                label,
-                value=True,
-                key=f"chk_memoire_{cat.lower()}"
-            )
-    else:
-        show_memoires_categories = None
-
-    categories_tensions = sorted({str(v).upper() for v in DICO_TENSIONS.values()})
-    show_tensions_categories: Optional[Dict[str, bool]] = None
-    if categories_tensions:
-        st.markdown("**Tensions sémantiques**")
-        show_tensions = st.checkbox(
-            "Afficher les tensions sémantiques",
-            value=True,
-            key="chk_tensions_global",
-        )
-    else:
-        show_tensions = False
-
-    st.markdown("**Marqueurs de causalité**")
-    show_consequences = st.checkbox("CONSEQUENCE", value=True, key="chk_consequence")
-    show_causes = st.checkbox("CAUSE", value=True, key="chk_cause")
-
-    st.markdown(css_badges(), unsafe_allow_html=True)
-    if not texte_source.strip():
-        st.info("Aucun texte fourni.")
-        frag = "<div class='texte-annote'>(Texte vide)</div>"
-    else:
-        frag = html_annote(
-            texte_source,
-            DICO_CONNECTEURS,
-            DICO_MARQUEURS,
-            DICO_MEMOIRES,
-            DICO_CONSQS if show_consequences else {},
-            DICO_CAUSES if show_causes else {},
-            DICO_TENSIONS if show_tensions else {},
-            show_codes=show_codes,
-            show_marqueurs_categories=show_marqueurs_categories,
-            show_memoires_categories=show_memoires_categories,
-            show_tensions_categories=show_tensions_categories,
-            show_consequences=show_consequences,
-            show_causes=show_causes,
-            show_tensions=show_tensions
-        )
-        st.markdown(frag, unsafe_allow_html=True)
-        st.download_button("Exporter le texte annoté (HTML)",
-                           data=html_autonome(frag).encode("utf-8"),
-                           file_name="texte_annote.html", mime="text/html",
-                           key="dl_annote_html")
+    render_detection_section(
+        texte_source,
+        detections_1,
+        key_prefix="disc1_",
+        use_regex_cc=use_regex_cc,
+    )
 
 # Onglet 3 : Dictionnaires (JSON)
 with ong3:
@@ -1470,3 +1577,27 @@ with ong_stats_norm:
         df_consq_lex,
         df_causes_lex,
     )
+
+with ong_discours:
+    st.subheader("Comparaison de deux discours")
+    if not texte_source.strip() and not texte_source_2.strip():
+        st.info("Chargez ou saisissez deux discours pour comparer les détections.")
+    else:
+        col_a, col_b = st.columns(2)
+        with col_a:
+            st.markdown("**Discours 1**")
+            render_detection_section(
+                texte_source,
+                detections_1,
+                key_prefix="disc1_compare_",
+                use_regex_cc=use_regex_cc,
+            )
+
+        with col_b:
+            st.markdown("**Discours 2**")
+            render_detection_section(
+                texte_source_2,
+                detections_2,
+                key_prefix="disc2_compare_",
+                use_regex_cc=use_regex_cc,
+            )
