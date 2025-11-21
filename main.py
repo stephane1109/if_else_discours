@@ -1266,8 +1266,8 @@ if not GV_OK:
 # Barre latérale : choix méthodes
 with st.sidebar:
     st.header("Méthodes d’analyse")
-    use_regex_cc = st.checkbox("Causalité par Regex (dictionnaires JSON)", value=True)
-    use_spacy_cc = st.checkbox("Causalité par spaCy (analyse NLP)", value=SPACY_OK)
+    use_regex_cc = st.checkbox("Dictionnaire json (règles Regex)", value=True)
+    use_spacy_cc = st.checkbox("Dictionnaire NLP (Spacy)", value=SPACY_OK)
 
 # Source du discours
 st.markdown("### Source du discours")
