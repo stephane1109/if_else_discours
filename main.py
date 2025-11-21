@@ -1354,8 +1354,8 @@ libelle_discours_2 = (
 )
 
 # Onglets
+
 (
-    tab_mapping,
     tab_detections,
     tab_conditions,
     tab_comparatif,
@@ -1364,10 +1364,10 @@ libelle_discours_2 = (
     tab_stats_norm,
     tab_discours,
     tab_dicos,
+    tab_mapping,
     tab_lexique,
 ) = st.tabs(
     [
-        "Expressions mappées",
         "Détections",
         "conditions logiques : si/alors",
         "Comparatif Regex / spaCy",
@@ -1376,25 +1376,12 @@ libelle_discours_2 = (
         "Stats norm",
         "2 discours",
         "Dictionnaires (JSON)",
+        "Expressions mappées",
         "Lexique",
     ]
 )
 
-# Onglet 1 : Expressions mappées
-with tab_mapping:
-    st.subheader("Expressions françaises mappées vers des règles conditionnelle (si / alors / sinon / tant que)")
-    if not DICO_CONNECTEURS:
-        st.info("Aucun connecteur chargé.")
-    else:
-        df_map = pd.DataFrame(sorted([(k, v) for k, v in DICO_CONNECTEURS.items()], key=lambda x: (x[1], x[0])),
-                              columns=["expression_française", "famille_python"])
-        st.dataframe(df_map, use_container_width=True, hide_index=True)
-        st.download_button("Exporter le mappage (CSV)",
-                           data=df_map.to_csv(index=False).encode("utf-8"),
-                           file_name="mapping_connecteurs.csv", mime="text/csv",
-                           key="dl_map_connecteurs_csv")
-
-# Onglet 2 : Détections (listes + texte annoté)
+# Onglet Détections (listes + texte annoté)
 with tab_detections:
     st.markdown(f"### {libelle_discours_1}")
     render_detection_section(
@@ -1419,6 +1406,20 @@ with tab_dicos:
     st.json(DICO_CAUSES, expanded=False)
     st.markdown("**souvenirs.json**")
     st.json(DICO_MEMOIRES, expanded=False)
+
+# Onglet Expressions mappées
+with tab_mapping:
+    st.subheader("Expressions françaises mappées vers des règles conditionnelle (si / alors / sinon / tant que)")
+    if not DICO_CONNECTEURS:
+        st.info("Aucun connecteur chargé.")
+    else:
+        df_map = pd.DataFrame(sorted([(k, v) for k, v in DICO_CONNECTEURS.items()], key=lambda x: (x[1], x[0])),
+                              columns=["expression_française", "famille_python"])
+        st.dataframe(df_map, use_container_width=True, hide_index=True)
+        st.download_button("Exporter le mappage (CSV)",
+                           data=df_map.to_csv(index=False).encode("utf-8"),
+                           file_name="mapping_connecteurs.csv", mime="text/csv",
+                           key="dl_map_connecteurs_csv")
 
 # Onglet Lexique
 with tab_lexique:
