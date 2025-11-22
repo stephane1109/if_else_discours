@@ -1453,10 +1453,11 @@ with tab_dicos:
                 st.success(
                     "Dictionnaire personnalisé chargé : il est maintenant utilisé pour les analyses."
                 )
-                if hasattr(st, "rerun"):
-                    st.rerun()
-                else:
-                    st.experimental_rerun()
+                # Le déclenchement explicite d'un rerun provoquait des boucles
+                # infinies sur Streamlit Cloud (l'uploader renvoyant toujours
+                # un fichier non vide). Le dictionnaire est déjà injecté dans
+                # st.session_state ; on laisse Streamlit rafraîchir la page
+                # normalement sans forcer un rerun manuel.
             except Exception as err:
                 st.error(f"Import impossible : {err}")
 
