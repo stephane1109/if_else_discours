@@ -33,10 +33,6 @@
   "gouvernement de mission": "TENS_OBJECTIFS_VS_CONCERTATION",
   "il n'agira qu'avec l'Assemblée nationale et le Sénat": "TENS_OBJECTIFS_VS_CONCERTATION",
 
-  "c'est une rupture": "TENS_DECLARATION_RUPTURE",
-  "presque une révolution": "TENS_DECLARATION_RUPTURE",
-  "changer de méthode": "TENS_DECLARATION_RUPTURE",
-
   "stabilité politique": "TENS_STABILITE_VS_TRANSFORMATION",
   "réformes utiles": "TENS_STABILITE_VS_TRANSFORMATION"
 }
