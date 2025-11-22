@@ -1423,6 +1423,9 @@ with tab_detections:
 # Onglet Dictionnaires (JSON)
 with tab_dicos:
     st.subheader("Aperçu des dictionnaires chargés (racine)")
+    st.caption(
+        "Vous pouvez importer votre propre dictionnaire JSON, mais vous devez impérativement respecter le nom d’origine."
+    )
 
     def bloc_dictionnaire(
         titre: str,
