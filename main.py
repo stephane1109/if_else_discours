@@ -467,6 +467,50 @@ def ajuster_negations_global(texte: str, df_marq: pd.DataFrame) -> pd.DataFrame:
 def _esc(s: str) -> str:
     return html.escape(s, quote=False)
 
+
+def inserer_marque_colorise(phrase: str, terme: str, couleur: str = "#c00000") -> str:
+    """Insère la 1ère occurrence de `terme` dans `phrase` sous la forme couleur rouge [terme]."""
+    if not phrase:
+        return ""
+    if not terme:
+        return _esc(phrase)
+
+    motif = re.compile(re.escape(str(terme)), flags=re.I)
+    m = motif.search(phrase)
+    if not m:
+        return _esc(phrase)
+
+    debut, fin = m.start(), m.end()
+    prefixe = _esc(phrase[:debut])
+    marque = phrase[debut:fin]
+    suffixe = _esc(phrase[fin:])
+    marque_html = (
+        f"<span style='color:{html.escape(couleur)}; font-weight:700;'>[{_esc(marque)}]</span>"
+    )
+    return prefixe + marque_html + suffixe
+
+
+def dataframe_phrase_colorisee(
+    df: pd.DataFrame,
+    colonne_terme: str,
+    colonne_phrase: str = "phrase",
+    couleur: str = "#c00000",
+    etiquette_phrase: str = "Phrase annotée",
+) -> pd.DataFrame:
+    """Ajoute une colonne HTML avec le terme mis en évidence dans la phrase."""
+    if df is None or df.empty:
+        return df
+
+    df_aff = df.copy()
+    df_aff[etiquette_phrase] = [
+        inserer_marque_colorise(
+            row.get(colonne_phrase, ""), row.get(colonne_terme, ""), couleur
+        )
+        for _, row in df_aff.iterrows()
+    ]
+    ordre_colonnes = [c for c in df_aff.columns if c not in {colonne_phrase, etiquette_phrase}]
+    return df_aff[ordre_colonnes + [etiquette_phrase]]
+
 def css_checkboxes_alignment() -> str:
     """CSS global pour harmoniser l'alignement des cases à cocher."""
     return """<style>
@@ -674,7 +718,14 @@ def render_detection_section(
     if df_conn.empty:
         st.info("Aucun connecteur détecté ou aucun texte fourni.")
     else:
-        st.dataframe(df_conn, use_container_width=True, hide_index=True)
+        df_conn_view = dataframe_phrase_colorisee(
+            df_conn,
+            "connecteur",
+            etiquette_phrase="Phrase (connecteur en rouge)",
+        )
+        st.markdown(
+            df_conn_view.to_html(index=False, escape=False), unsafe_allow_html=True
+        )
         st.download_button(
             "Exporter connecteurs (CSV)",
             data=df_conn.to_csv(index=False).encode("utf-8"),
@@ -687,7 +738,14 @@ def render_detection_section(
     if df_marq.empty:
         st.info("Aucun marqueur détecté.")
     else:
-        st.dataframe(df_marq, use_container_width=True, hide_index=True)
+        df_marq_view = dataframe_phrase_colorisee(
+            df_marq,
+            "marqueur",
+            etiquette_phrase="Phrase (marqueur en rouge)",
+        )
+        st.markdown(
+            df_marq_view.to_html(index=False, escape=False), unsafe_allow_html=True
+        )
         st.download_button(
             "Exporter marqueurs (CSV)",
             data=df_marq.to_csv(index=False).encode("utf-8"),
@@ -702,7 +760,15 @@ def render_detection_section(
     elif df_tensions.empty:
         st.info("Aucune tension sémantique détectée dans le texte.")
     else:
-        st.dataframe(df_tensions, use_container_width=True, hide_index=True)
+        df_tensions_view = dataframe_phrase_colorisee(
+            df_tensions,
+            "expression",
+            etiquette_phrase="Phrase (tension en rouge)",
+        )
+        st.markdown(
+            df_tensions_view.to_html(index=False, escape=False),
+            unsafe_allow_html=True,
+        )
         st.download_button(
             "Exporter tensions sémantiques (CSV)",
             data=df_tensions.to_csv(index=False).encode("utf-8"),
@@ -715,7 +781,15 @@ def render_detection_section(
     if df_memoires.empty:
         st.info("Aucun marqueur mémoire détecté.")
     else:
-        st.dataframe(df_memoires, use_container_width=True, hide_index=True)
+        df_memoires_view = dataframe_phrase_colorisee(
+            df_memoires,
+            "memoire",
+            etiquette_phrase="Phrase (mémoire en rouge)",
+        )
+        st.markdown(
+            df_memoires_view.to_html(index=False, escape=False),
+            unsafe_allow_html=True,
+        )
         st.download_button(
             "Exporter marqueurs mémoire (CSV)",
             data=df_memoires.to_csv(index=False).encode("utf-8"),
@@ -732,7 +806,15 @@ def render_detection_section(
         elif df_consq_lex.empty:
             st.info("Aucun déclencheur de conséquence détecté par Regex.")
         else:
-            st.dataframe(df_consq_lex, use_container_width=True, hide_index=True)
+            df_consq_view = dataframe_phrase_colorisee(
+                df_consq_lex,
+                "consequence",
+                etiquette_phrase="Phrase (conséquence en rouge)",
+            )
+            st.markdown(
+                df_consq_view.to_html(index=False, escape=False),
+                unsafe_allow_html=True,
+            )
             st.download_button(
                 "Exporter conséquences (CSV)",
                 data=df_consq_lex.to_csv(index=False).encode("utf-8"),
@@ -747,7 +829,15 @@ def render_detection_section(
         elif df_causes_lex.empty:
             st.info("Aucun déclencheur de cause détecté par Regex.")
         else:
-            st.dataframe(df_causes_lex, use_container_width=True, hide_index=True)
+            df_causes_view = dataframe_phrase_colorisee(
+                df_causes_lex,
+                "cause",
+                etiquette_phrase="Phrase (cause en rouge)",
+            )
+            st.markdown(
+                df_causes_view.to_html(index=False, escape=False),
+                unsafe_allow_html=True,
+            )
             st.download_button(
                 "Exporter causes (CSV)",
                 data=df_causes_lex.to_csv(index=False).encode("utf-8"),
