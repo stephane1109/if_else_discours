@@ -751,14 +751,7 @@ def render_detection_section(
     if df_conn.empty:
         st.info("Aucun connecteur détecté ou aucun texte fourni.")
     else:
-        df_conn_view = dataframe_phrase_colorisee(
-            df_conn,
-            "connecteur",
-            etiquette_phrase="Phrase (connecteur en rouge)",
-        )
-        st.markdown(
-            df_conn_view.to_html(index=False, escape=False), unsafe_allow_html=True
-        )
+        st.dataframe(df_conn)
         st.download_button(
             "Exporter connecteurs (CSV)",
             data=df_conn.to_csv(index=False).encode("utf-8"),
@@ -771,14 +764,7 @@ def render_detection_section(
     if df_marq.empty:
         st.info("Aucun marqueur détecté.")
     else:
-        df_marq_view = dataframe_phrase_colorisee(
-            df_marq,
-            "marqueur",
-            etiquette_phrase="Phrase (marqueur en rouge)",
-        )
-        st.markdown(
-            df_marq_view.to_html(index=False, escape=False), unsafe_allow_html=True
-        )
+        st.dataframe(df_marq)
         st.download_button(
             "Exporter marqueurs (CSV)",
             data=df_marq.to_csv(index=False).encode("utf-8"),
@@ -793,15 +779,7 @@ def render_detection_section(
     elif df_tensions.empty:
         st.info("Aucune tension sémantique détectée dans le texte.")
     else:
-        df_tensions_view = dataframe_phrase_colorisee(
-            df_tensions,
-            "expression",
-            etiquette_phrase="Phrase (tension en rouge)",
-        )
-        st.markdown(
-            df_tensions_view.to_html(index=False, escape=False),
-            unsafe_allow_html=True,
-        )
+        st.dataframe(df_tensions)
         st.download_button(
             "Exporter tensions sémantiques (CSV)",
             data=df_tensions.to_csv(index=False).encode("utf-8"),
@@ -814,15 +792,7 @@ def render_detection_section(
     if df_memoires.empty:
         st.info("Aucun marqueur mémoire détecté.")
     else:
-        df_memoires_view = dataframe_phrase_colorisee(
-            df_memoires,
-            "memoire",
-            etiquette_phrase="Phrase (mémoire en rouge)",
-        )
-        st.markdown(
-            df_memoires_view.to_html(index=False, escape=False),
-            unsafe_allow_html=True,
-        )
+        st.dataframe(df_memoires)
         st.download_button(
             "Exporter marqueurs mémoire (CSV)",
             data=df_memoires.to_csv(index=False).encode("utf-8"),
@@ -839,15 +809,7 @@ def render_detection_section(
         elif df_consq_lex.empty:
             st.info("Aucun déclencheur de conséquence détecté par Regex.")
         else:
-            df_consq_view = dataframe_phrase_colorisee(
-                df_consq_lex,
-                "consequence",
-                etiquette_phrase="Phrase (conséquence en rouge)",
-            )
-            st.markdown(
-                df_consq_view.to_html(index=False, escape=False),
-                unsafe_allow_html=True,
-            )
+            st.dataframe(df_consq_lex)
             st.download_button(
                 "Exporter conséquences (CSV)",
                 data=df_consq_lex.to_csv(index=False).encode("utf-8"),
@@ -862,15 +824,7 @@ def render_detection_section(
         elif df_causes_lex.empty:
             st.info("Aucun déclencheur de cause détecté par Regex.")
         else:
-            df_causes_view = dataframe_phrase_colorisee(
-                df_causes_lex,
-                "cause",
-                etiquette_phrase="Phrase (cause en rouge)",
-            )
-            st.markdown(
-                df_causes_view.to_html(index=False, escape=False),
-                unsafe_allow_html=True,
-            )
+            st.dataframe(df_causes_lex)
             st.download_button(
                 "Exporter causes (CSV)",
                 data=df_causes_lex.to_csv(index=False).encode("utf-8"),
@@ -878,31 +832,6 @@ def render_detection_section(
                 mime="text/csv",
                 key=f"{key_prefix}dl_occ_causes_csv",
             )
-
-    st.markdown("---")
-    _subheader("Tableaux des marqueurs et connecteurs")
-    _tableau_couleurs_depuis_dico(
-        "Connecteurs (couleur rouge par défaut)",
-        DICO_CONNECTEURS,
-        COULEURS_BADGES,
-    )
-    _tableau_couleurs_depuis_dico(
-        "Marqueurs normatifs", DICO_MARQUEURS, COULEURS_MARQUEURS
-    )
-    _tableau_couleurs_depuis_dico(
-        "Marqueurs mémoire", DICO_MEMOIRES, COULEURS_MARQUEURS
-    )
-    _tableau_couleurs_depuis_dico(
-        "Déclencheurs de conséquence", DICO_CONSQS, COULEURS_MARQUEURS
-    )
-    _tableau_couleurs_depuis_dico(
-        "Déclencheurs de cause", DICO_CAUSES, COULEURS_MARQUEURS
-    )
-    st.markdown(
-        "<div style='color:#c00000; font-weight:700;'>Exemple : couleur rouge [donc]</div>",
-        unsafe_allow_html=True,
-    )
-    st.markdown("---")
     _subheader("Texte annoté")
 
     codes_disponibles = sorted({str(v).upper() for v in DICO_CONNECTEURS.values()})
