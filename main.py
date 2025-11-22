@@ -645,6 +645,39 @@ def html_autonome(fragment_html: str) -> str:
     return f"<!DOCTYPE html><html lang='fr'><head><meta charset='utf-8'/><title>Texte annoté</title>{css_badges()}</head><body>{fragment_html}</body></html>"
 
 
+def _couleur_depuis_palette(cle: str, palette: Dict[str, Dict[str, str]], par_defaut: str = "#c00000") -> str:
+    """Retourne la couleur de premier plan pour une catégorie donnée."""
+    return palette.get(str(cle).upper(), {}).get("fg", par_defaut)
+
+
+def _tableau_couleurs_depuis_dico(
+    titre: str,
+    dico: Dict[str, Any],
+    palette: Dict[str, Dict[str, str]],
+    etiquette_label: str = "Étiquette",
+) -> None:
+    """Affiche un tableau HTML avec un exemple coloré [entrée] pour chaque élément du dictionnaire."""
+    st.markdown(f"**{titre}**")
+    if not dico:
+        st.info("Aucune entrée disponible.")
+        return
+
+    lignes = []
+    for expression, etiquette in sorted(dico.items(), key=lambda x: str(x[0]).lower()):
+        couleur = _couleur_depuis_palette(etiquette, palette)
+        exemple = f"<span style='color:{html.escape(couleur)}; font-weight:700;'>[{html.escape(str(expression))}]</span>"
+        lignes.append(
+            {
+                "Entrée": expression,
+                etiquette_label: str(etiquette).upper(),
+                "Exemple coloré": exemple,
+            }
+        )
+
+    df = pd.DataFrame(lignes)
+    st.markdown(df.to_html(index=False, escape=False), unsafe_allow_html=True)
+
+
 def render_detection_section(
     texte_source: str,
     detections: Dict[str, pd.DataFrame],
@@ -756,6 +789,29 @@ def render_detection_section(
                 key=f"{key_prefix}dl_occ_causes_csv",
             )
 
+    st.markdown("---")
+    _subheader("Tableaux des marqueurs et connecteurs")
+    _tableau_couleurs_depuis_dico(
+        "Connecteurs (couleur rouge par défaut)",
+        DICO_CONNECTEURS,
+        COULEURS_BADGES,
+    )
+    _tableau_couleurs_depuis_dico(
+        "Marqueurs normatifs", DICO_MARQUEURS, COULEURS_MARQUEURS
+    )
+    _tableau_couleurs_depuis_dico(
+        "Marqueurs mémoire", DICO_MEMOIRES, COULEURS_MARQUEURS
+    )
+    _tableau_couleurs_depuis_dico(
+        "Déclencheurs de conséquence", DICO_CONSQS, COULEURS_MARQUEURS
+    )
+    _tableau_couleurs_depuis_dico(
+        "Déclencheurs de cause", DICO_CAUSES, COULEURS_MARQUEURS
+    )
+    st.markdown(
+        "<div style='color:#c00000; font-weight:700;'>Exemple : couleur rouge [donc]</div>",
+        unsafe_allow_html=True,
+    )
     st.markdown("---")
     _subheader("Texte annoté")
 
