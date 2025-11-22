@@ -1426,57 +1426,47 @@ with tab_dicos:
         titre: str,
         cle: str,
         dico_actif: Dict[str, str],
-        dico_racine: Dict[str, str],
     ):
         st.markdown(f"**{titre}**")
-        col_l, col_r = st.columns(2)
-        with col_l:
-            st.caption("Dictionnaire racine (lecture seule)")
-            st.json(dico_racine, expanded=False)
-            st.download_button(
-                "Télécharger le dictionnaire racine",
-                data=dictionnaire_to_bytes(dico_racine),
-                file_name=f"{cle}.json",
-                mime="application/json",
-                key=f"dl_racine_{cle}_json",
-            )
-        with col_r:
-            st.caption("Dictionnaire actif (utilisé pour les analyses)")
-            st.json(dico_actif, expanded=False)
-            st.download_button(
-                "Télécharger le dictionnaire actif",
-                data=dictionnaire_to_bytes(dico_actif),
-                file_name=f"{cle}_actif.json",
-                mime="application/json",
-                key=f"dl_actif_{cle}_json",
-            )
-            fichier_import = st.file_uploader(
-                "Importer un dictionnaire JSON",
-                type=["json"],
-                key=f"upload_{cle}",
-                label_visibility="visible",
-                help="Le fichier doit contenir un objet JSON {expression: etiquette}.",
-            )
-            if fichier_import is not None:
-                try:
-                    dico_charge = parse_uploaded_dictionary(
-                        fichier_import, normalizer=normaliser_espace
-                    )
-                    st.session_state["dicos_actifs"][cle] = dico_charge
-                    st.success(
-                        "Dictionnaire personnalisé chargé : il est maintenant utilisé pour les analyses."
-                    )
+        st.caption("Dictionnaire actif (lecture seule)")
+        st.json(dico_actif, expanded=False)
+        st.download_button(
+            "Télécharger le dictionnaire actif",
+            data=dictionnaire_to_bytes(dico_actif),
+            file_name=f"{cle}_actif.json",
+            mime="application/json",
+            key=f"dl_actif_{cle}_json",
+        )
+        fichier_import = st.file_uploader(
+            "Importer un dictionnaire JSON",
+            type=["json"],
+            key=f"upload_{cle}",
+            label_visibility="visible",
+            help="Le fichier doit contenir un objet JSON {expression: etiquette}.",
+        )
+        if fichier_import is not None:
+            try:
+                dico_charge = parse_uploaded_dictionary(
+                    fichier_import, normalizer=normaliser_espace
+                )
+                st.session_state["dicos_actifs"][cle] = dico_charge
+                st.success(
+                    "Dictionnaire personnalisé chargé : il est maintenant utilisé pour les analyses."
+                )
+                if hasattr(st, "rerun"):
+                    st.rerun()
+                else:
                     st.experimental_rerun()
-                except Exception as err:
-                    st.error(f"Import impossible : {err}")
+            except Exception as err:
+                st.error(f"Import impossible : {err}")
 
-    bloc_dictionnaire("conditions.json", "conditions", DICO_CONDITIONS, DICOS_RACINE["conditions"])
-    bloc_dictionnaire("alternatives.json", "alternatives", DICO_ALTERNATIVES, DICOS_RACINE["alternatives"])
-    bloc_dictionnaire("dict_marqueurs.json", "marqueurs", DICO_MARQUEURS, DICOS_RACINE["marqueurs"])
-    bloc_dictionnaire("consequences.json", "consequences", DICO_CONSQS, DICOS_RACINE["consequences"])
-    bloc_dictionnaire("causes.json", "causes", DICO_CAUSES, DICOS_RACINE["causes"])
-    bloc_dictionnaire("souvenirs.json", "souvenirs", DICO_MEMOIRES, DICOS_RACINE["souvenirs"])
-    bloc_dictionnaire("tension_semantique.json", "tensions", DICO_TENSIONS, DICOS_RACINE["tensions"])
+    bloc_dictionnaire("conditions.json", "conditions", DICO_CONDITIONS)
+    bloc_dictionnaire("alternatives.json", "alternatives", DICO_ALTERNATIVES)
+    bloc_dictionnaire("dict_marqueurs.json", "marqueurs", DICO_MARQUEURS)
+    bloc_dictionnaire("consequences.json", "consequences", DICO_CONSQS)
+    bloc_dictionnaire("causes.json", "causes", DICO_CAUSES)
+    bloc_dictionnaire("souvenirs.json", "souvenirs", DICO_MEMOIRES)
+    bloc_dictionnaire("tension_semantique.json", "tensions", DICO_TENSIONS)
 
 # Onglet Expressions mappées
 with tab_mapping:
