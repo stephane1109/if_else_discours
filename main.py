@@ -1232,6 +1232,8 @@ def table_spacy_df(df_spacy: pd.DataFrame) -> pd.DataFrame:
 st.set_page_config(page_title="Discours → Code (Regex vs spaCy + JSON racine)", page_icon=None, layout="wide")
 st.markdown(css_checkboxes_alignment(), unsafe_allow_html=True)
 st.title("Discours → Code : SI / ALORS / SINON / TANT QUE + marqueurs + causes/conséquences (Regex vs spaCy)")
+st.markdown("[www.codeandcortex.fr](https://www.codeandcortex.fr)")
+st.write("")
 
 # Chargement des dicos
 try:
