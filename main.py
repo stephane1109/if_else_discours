@@ -30,6 +30,7 @@ from stats import render_stats_tab
 from stats_norm import render_stats_norm_tab
 from cooccurrences import render_cooccurrences_tab
 from conditions_spacy import analyser_conditions_spacy
+from toulmin import charger_lexiques_toulmin, detecter_toulmin
 
 # =========================
 # Détection Graphviz (pour export JPEG)
@@ -1470,6 +1471,7 @@ libelle_discours_2 = (
     tab_dicos,
     tab_mapping,
     tab_lexique,
+    tab_toulmin,
 ) = st.tabs(
     [
         "Détections",
@@ -1482,6 +1484,7 @@ libelle_discours_2 = (
         "Dictionnaires (JSON)",
         "Expressions mappées",
         "Lexique",
+        "Arg Toulmin",
     ]
 )
 
@@ -1618,6 +1621,36 @@ with tab_lexique:
         "- **CONSEQUENCE_ADV** : conséquence exprimée par un adverbe ou un groupe adverbial (ex. *donc*, *par conséquent*). Exemple : *Il a tout expliqué, par conséquent nous comprenons la décision.*\n"
         "- **CAUSE_SUBORDONNEE** : cause formulée par une proposition subordonnée (ex. *parce que*, *puisque*…). Exemple : *Parce qu’il pleuvait, la cérémonie a été déplacée à l’intérieur.*"
     )
+
+# Onglet Argumentation (Toulmin)
+with tab_toulmin:
+    st.subheader("Analyse argumentative — schéma de Toulmin")
+    st.caption(
+        "Repérage des composantes CLAIM / DATA / WARRANT / BACKING / QUALIFIER / REBUTTAL à partir d'expressions clés."
+    )
+
+    if not texte_source.strip():
+        st.info("Aucun texte fourni.")
+    else:
+        lexiques_toulmin = charger_lexiques_toulmin()
+
+        with st.expander("Lexiques utilisés (argumToulmin.json)", expanded=False):
+            st.json(lexiques_toulmin, expanded=False)
+
+        detections_toulmin = detecter_toulmin(texte_source, lexiques_toulmin)
+        if not detections_toulmin:
+            st.info("Aucune composante du schéma de Toulmin n'a été identifiée.")
+        else:
+            df_toulmin = pd.DataFrame(detections_toulmin)
+            df_toulmin = df_toulmin[["id_phrase", "categorie", "marqueur", "phrase"]]
+            st.dataframe(df_toulmin, use_container_width=True, hide_index=True)
+            st.download_button(
+                "Exporter les occurrences (CSV)",
+                data=df_toulmin.to_csv(index=False).encode("utf-8"),
+                file_name="toulmin_occurrences.csv",
+                mime="text/csv",
+                key="dl_toulmin_csv",
+            )
 
 # Onglet 3 : conditions logiques : si/alors
 with tab_conditions:
