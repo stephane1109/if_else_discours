@@ -250,28 +250,28 @@ def _render_toulmin_analysis(
         return
 
     detections_toulmin = detecter_toulmin(texte_source, lexiques_toulmin)
-    if not detections_toulmin:
-        st.info("Aucune composante du schéma de Toulmin n'a été identifiée.")
-        return
-
     df_toulmin = _preparer_dataframe_toulmin(detections_toulmin)
-    df_affichage = df_toulmin.rename(
-        columns={
-            "id_phrase": "Phrase #",
-            "categorie_label": "Catégorie (FR / EN)",
-            "marqueur": "Marqueur",
-            "phrase": "Phrase",
-        }
-    )[["Phrase #", "Catégorie (FR / EN)", "Marqueur", "Phrase"]]
 
-    st.dataframe(df_affichage, use_container_width=True, hide_index=True)
-    st.download_button(
-        "Exporter les occurrences (CSV)",
-        data=df_affichage.to_csv(index=False).encode("utf-8"),
-        file_name="toulmin_occurrences.csv",
-        mime="text/csv",
-        key=f"{key_prefix}dl_toulmin_csv",
-    )
+    if df_toulmin.empty:
+        st.info("Aucune composante du schéma de Toulmin n'a été identifiée.")
+    else:
+        df_affichage = df_toulmin.rename(
+            columns={
+                "id_phrase": "Phrase #",
+                "categorie_label": "Catégorie (FR / EN)",
+                "marqueur": "Marqueur",
+                "phrase": "Phrase",
+            }
+        )[["Phrase #", "Catégorie (FR / EN)", "Marqueur", "Phrase"]]
+
+        st.dataframe(df_affichage, use_container_width=True, hide_index=True)
+        st.download_button(
+            "Exporter les occurrences (CSV)",
+            data=df_affichage.to_csv(index=False).encode("utf-8"),
+            file_name="toulmin_occurrences.csv",
+            mime="text/csv",
+            key=f"{key_prefix}dl_toulmin_csv",
+        )
 
     st.markdown("#### Texte annoté (Toulmin)")
     categories = sorted(df_toulmin["categorie_norm"].unique())
