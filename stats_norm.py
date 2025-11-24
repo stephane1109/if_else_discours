@@ -215,7 +215,7 @@ def _render_stats_norm_block(
         total_alt = len(serie_alternatives)
         ratio_alt = _normaliser_par_mille(total_alt, total_mots)
         st.metric(
-            "Connecteurs « sinon » / alternatifs",
+            "Connecteurs logiques « sinon » / alternatifs",
             f"{total_alt}",
             delta=f"{ratio_alt:.2f} / 1 000 mots",
         )
@@ -239,11 +239,11 @@ def _render_stats_norm_block(
 
     sections.append(
         (
-            "Connecteurs",
+            "Connecteurs logiques",
             _resultats_par_categorie(
                 serie_connecteurs,
                 total_mots,
-                "Connecteurs",
+                "Connecteurs logiques",
                 ajouter_total=True,
                 format_categorie=pretty_label,
             ),

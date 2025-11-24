@@ -350,7 +350,7 @@ def lire_fichier_txt(uploaded_file) -> str:
     return donnees.decode("utf-8", errors="ignore")
 
 # =========================
-# Détection (connecteurs / marqueurs / conséquence / cause)
+# Détection (Connecteurs logiques / marqueurs / conséquence / cause)
 # =========================
 def detecter_par_dico(texte: str, dico: Dict[str, str], champ_cle: str, champ_cat: str) -> pd.DataFrame:
     """Détection générique par dictionnaire clé→étiquette (insensible à la casse)."""
@@ -748,15 +748,15 @@ def render_detection_section(
         else:
             st.subheader(titre)
 
-    _subheader("Connecteurs détectés")
+    _subheader("Connecteurs logiques détectés")
     if df_conn.empty:
-        st.info("Aucun connecteur détecté ou aucun texte fourni.")
+        st.info("Aucun Connecteur logique détecté ou aucun texte fourni.")
     else:
         st.dataframe(df_conn)
         st.download_button(
-            "Exporter connecteurs (CSV)",
+            "Exporter Connecteurs logiques (CSV)",
             data=df_conn.to_csv(index=False).encode("utf-8"),
-            file_name="occurrences_connecteurs.csv",
+            file_name="occurrences_connecteurs_logiques.csv",
             mime="text/csv",
             key=f"{key_prefix}dl_occ_conn_csv",
         )
@@ -838,13 +838,13 @@ def render_detection_section(
     codes_disponibles = sorted({str(v).upper() for v in DICO_CONNECTEURS.values()})
     show_codes: Dict[str, bool] = {}
     if codes_disponibles:
-        st.markdown("**Familles de connecteurs**")
+        st.markdown("**Familles de Connecteurs logiques**")
         col_all, col_none = st.columns(2)
         activer_conn = col_all.button(
-            "Tout cocher (connecteurs)", key=f"{key_prefix}btn_conn_all"
+            "Tout cocher (Connecteurs logiques)", key=f"{key_prefix}btn_conn_all"
         )
         desactiver_conn = col_none.button(
-            "Tout décocher (connecteurs)", key=f"{key_prefix}btn_conn_none"
+            "Tout décocher (Connecteurs logiques)", key=f"{key_prefix}btn_conn_none"
         )
         if activer_conn or desactiver_conn:
             toggle_checkboxes(
@@ -1556,14 +1556,14 @@ with tab_dicos:
 with tab_mapping:
     st.subheader("Expressions françaises mappées vers des règles conditionnelle (si / alors / sinon / tant que)")
     if not DICO_CONNECTEURS:
-        st.info("Aucun connecteur chargé.")
+        st.info("Aucun Connecteur logique chargé.")
     else:
         df_map = pd.DataFrame(sorted([(k, v) for k, v in DICO_CONNECTEURS.items()], key=lambda x: (x[1], x[0])),
                               columns=["expression_française", "famille_python"])
         st.dataframe(df_map, use_container_width=True, hide_index=True)
         st.download_button("Exporter le mappage (CSV)",
                            data=df_map.to_csv(index=False).encode("utf-8"),
-                           file_name="mapping_connecteurs.csv", mime="text/csv",
+                           file_name="mapping_connecteurs_logiques.csv", mime="text/csv",
                            key="dl_map_connecteurs_csv")
 
 # Onglet Lexique
@@ -1573,7 +1573,7 @@ with tab_lexique:
         "- **APODOSE** : Proposition principale qui, placée après une subordonnée conditionnelle (protase), en indique la conséquence. Exemple : *Si j’insiste* (protase), *il viendra* (apodose)."
     )
 
-    st.markdown("#### Connecteurs \"logiques\" (façon Python)")
+    st.markdown("#### Connecteurs logiques (façon Python)")
     st.markdown(
         "- **IF (si…)** : introduit une condition ; ce qui suit dépend du fait que la condition soit vraie.\n"
         "- **ELSE (sinon)** : propose l’alternative quand la condition précédente n’est pas remplie.\n"
