@@ -52,6 +52,16 @@ TOULMIN_DEFINITIONS: Dict[str, str] = {
     ),
 }
 
+# Libellés français → anglais (ordre demandé : traduction FR devant l'indicateur)
+TOULMIN_LABELS_FR: Dict[str, str] = {
+    "CLAIM": "Thèse (Claim)",
+    "DATA": "Données (Data / Grounds)",
+    "WARRANT": "Garant (Warrant)",
+    "BACKING": "Soutien (Backing)",
+    "QUALIFIER": "Modalisation (Qualifier)",
+    "REBUTTAL": "Réfutation / Restriction (Rebuttal)",
+}
+
 PALETTE_TOULMIN: Dict[str, Dict[str, str]] = {
     "CLAIM": {"bg": "#fff2e6", "fg": "#b35900", "bd": "#b35900"},
     "DATA": {"bg": "#e6f4ff", "fg": "#1565c0", "bd": "#1565c0"},
@@ -63,6 +73,11 @@ PALETTE_TOULMIN: Dict[str, Dict[str, str]] = {
 
 
 _ALPHA = "A-Za-zÀ-ÖØ-öø-ÿ"
+
+
+def _libelle_categorie_toulmin(categorie: str) -> str:
+    cat_norm = str(categorie).upper()
+    return TOULMIN_LABELS_FR.get(cat_norm, str(categorie).title())
 
 
 def _esc(texte: str) -> str:
@@ -166,7 +181,15 @@ def _render_definitions() -> None:
     for cat in ["CLAIM", "DATA", "WARRANT", "BACKING", "QUALIFIER", "REBUTTAL"]:
         definition = TOULMIN_DEFINITIONS.get(cat, "")
         if definition:
-            st.markdown(f"- **{cat.title()}** — {definition}")
+            label = _libelle_categorie_toulmin(cat)
+            st.markdown(f"- **{label}** — {definition}")
+
+
+def _preparer_dataframe_toulmin(detections_toulmin: List[Dict[str, Any]]) -> pd.DataFrame:
+    df_toulmin = pd.DataFrame(detections_toulmin, columns=["id_phrase", "categorie", "marqueur", "phrase"])
+    df_toulmin["categorie_norm"] = df_toulmin["categorie"].str.upper()
+    df_toulmin["categorie_label"] = df_toulmin["categorie_norm"].apply(_libelle_categorie_toulmin)
+    return df_toulmin
 
 
 def _render_stats(texte_source: str, df_toulmin: pd.DataFrame) -> None:
@@ -188,62 +211,91 @@ def _render_stats(texte_source: str, df_toulmin: pd.DataFrame) -> None:
             return
         total = len(df_toulmin)
         st.metric("Occurrences totales", total)
-        repartition = df_toulmin["categorie"].value_counts().rename_axis("categorie").reset_index(name="compte")
+        repartition = (
+            df_toulmin.groupby(["categorie_norm", "categorie_label"])
+            .size()
+            .reset_index(name="compte")
+            .rename(columns={"categorie_label": "Catégorie (FR / EN)"})
+        )
         repartition["part_%"] = repartition["compte"].div(total).mul(100).round(1)
-        st.dataframe(repartition, use_container_width=True, hide_index=True)
+        st.dataframe(repartition[["Catégorie (FR / EN)", "compte", "part_%"]], use_container_width=True, hide_index=True)
+
+        # Graphique de répartition
+        couleurs = [
+            PALETTE_TOULMIN.get(cat_norm, {"fg": "#6b7280"}).get("fg", "#6b7280")
+            for cat_norm in repartition["categorie_norm"]
+        ]
+        chart_data = repartition.rename(columns={"compte": "Occurrences"})
+        chart_data["Couleur"] = couleurs
+        st.bar_chart(
+            chart_data,
+            x="Catégorie (FR / EN)",
+            y="Occurrences",
+            color="Couleur",
+        )
 
 
-def render_toulmin_tab(texte_source: str) -> None:
-    """Affiche tout le contenu de l'onglet Arg Toulmin."""
-
-    st.subheader("Analyse argumentative — schéma de Toulmin")
-    st.caption(
-        "Repérage des composantes CLAIM / DATA / WARRANT / BACKING / QUALIFIER / REBUTTAL à partir d'expressions clés."
-    )
-
-    _render_definitions()
+def _render_toulmin_analysis(
+    texte_source: str,
+    lexiques_toulmin: Dict[str, Iterable[str]],
+    heading: str,
+    key_prefix: str,
+    couleur_heading: str | None = None,
+) -> None:
+    heading_html = html.escape(heading)
+    if couleur_heading:
+        st.markdown(
+            f"<h3 style='margin-bottom:0; color:{couleur_heading};'>{heading_html}</h3>",
+            unsafe_allow_html=True,
+        )
+    else:
+        st.markdown(f"### {heading_html}")
 
     if not texte_source.strip():
-        st.info("Aucun texte fourni.")
+        st.info("Aucun texte fourni pour ce discours.")
         return
-
-    lexiques_toulmin = charger_lexiques_toulmin()
-
-    with st.expander("Lexiques utilisés (argumToulmin.json)", expanded=False):
-        st.json(lexiques_toulmin, expanded=False)
 
     detections_toulmin = detecter_toulmin(texte_source, lexiques_toulmin)
     if not detections_toulmin:
         st.info("Aucune composante du schéma de Toulmin n'a été identifiée.")
         return
 
-    df_toulmin = pd.DataFrame(detections_toulmin)
-    df_toulmin = df_toulmin[["id_phrase", "categorie", "marqueur", "phrase"]]
-    st.dataframe(df_toulmin, use_container_width=True, hide_index=True)
+    df_toulmin = _preparer_dataframe_toulmin(detections_toulmin)
+    df_affichage = df_toulmin.rename(
+        columns={
+            "id_phrase": "Phrase #",
+            "categorie_label": "Catégorie (FR / EN)",
+            "marqueur": "Marqueur",
+            "phrase": "Phrase",
+        }
+    )[["Phrase #", "Catégorie (FR / EN)", "Marqueur", "Phrase"]]
+
+    st.dataframe(df_affichage, use_container_width=True, hide_index=True)
     st.download_button(
         "Exporter les occurrences (CSV)",
-        data=df_toulmin.to_csv(index=False).encode("utf-8"),
+        data=df_affichage.to_csv(index=False).encode("utf-8"),
         file_name="toulmin_occurrences.csv",
         mime="text/csv",
-        key="dl_toulmin_csv",
+        key=f"{key_prefix}dl_toulmin_csv",
     )
 
     st.markdown("#### Texte annoté (Toulmin)")
-    categories = sorted(df_toulmin["categorie"].unique())
+    categories = sorted(df_toulmin["categorie_norm"].unique())
     show_categories = {cat: True for cat in categories}
     with st.expander("Afficher / masquer des catégories", expanded=False):
         col_all, col_none = st.columns(2)
-        if col_all.button("Tout cocher", key="toulmin_all"):
+        if col_all.button("Tout cocher", key=f"{key_prefix}toulmin_all"):
             for cat in categories:
-                st.session_state[f"chk_toulmin_{cat}"] = True
-        if col_none.button("Tout décocher", key="toulmin_none"):
+                st.session_state[f"{key_prefix}chk_toulmin_{cat}"] = True
+        if col_none.button("Tout décocher", key=f"{key_prefix}toulmin_none"):
             for cat in categories:
-                st.session_state[f"chk_toulmin_{cat}"] = False
+                st.session_state[f"{key_prefix}chk_toulmin_{cat}"] = False
         for cat in categories:
+            label = _libelle_categorie_toulmin(cat)
             show_categories[cat] = st.checkbox(
-                cat.title(),
-                value=st.session_state.get(f"chk_toulmin_{cat}", True),
-                key=f"chk_toulmin_{cat}",
+                label,
+                value=st.session_state.get(f"{key_prefix}chk_toulmin_{cat}", True),
+                key=f"{key_prefix}chk_toulmin_{cat}",
             )
 
     st.markdown(_css_toulmin_badges(), unsafe_allow_html=True)
@@ -258,7 +310,61 @@ def render_toulmin_tab(texte_source: str) -> None:
         data=frag.encode("utf-8"),
         file_name="texte_toulmin_annote.html",
         mime="text/html",
-        key="dl_toulmin_html",
+        key=f"{key_prefix}dl_toulmin_html",
     )
 
     _render_stats(texte_source, df_toulmin)
+
+
+def render_toulmin_tab(
+    texte_source: str,
+    texte_source_2: str | None = None,
+    heading_discours_1: str = "Discours 1",
+    heading_discours_2: str = "Discours 2",
+    couleur_discours_1: str = "#c00000",
+    couleur_discours_2: str = "#1f4e79",
+) -> None:
+    """Affiche tout le contenu de l'onglet Arg Toulmin."""
+
+    st.subheader("Analyse argumentative — schéma de Toulmin")
+    st.caption(
+        "Repérage des composantes CLAIM / DATA / WARRANT / BACKING / QUALIFIER / REBUTTAL à partir d'expressions clés."
+    )
+
+    _render_definitions()
+
+    if not texte_source.strip() and not (texte_source_2 and texte_source_2.strip()):
+        st.info("Aucun texte fourni.")
+        return
+
+    lexiques_toulmin = charger_lexiques_toulmin()
+
+    with st.expander("Lexiques utilisés (argumToulmin.json)", expanded=False):
+        st.json(lexiques_toulmin, expanded=False)
+
+    if texte_source_2 and texte_source_2.strip():
+        tab_disc1, tab_disc2 = st.tabs([heading_discours_1, heading_discours_2])
+        with tab_disc1:
+            _render_toulmin_analysis(
+                texte_source,
+                lexiques_toulmin,
+                heading_discours_1,
+                key_prefix="disc1_",
+                couleur_heading=couleur_discours_1,
+            )
+        with tab_disc2:
+            _render_toulmin_analysis(
+                texte_source_2,
+                lexiques_toulmin,
+                heading_discours_2,
+                key_prefix="disc2_",
+                couleur_heading=couleur_discours_2,
+            )
+    else:
+        _render_toulmin_analysis(
+            texte_source,
+            lexiques_toulmin,
+            heading_discours_1,
+            key_prefix="disc1_",
+            couleur_heading=couleur_discours_1,
+        )

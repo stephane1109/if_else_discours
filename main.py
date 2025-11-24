@@ -1624,7 +1624,14 @@ with tab_lexique:
 
 # Onglet Argumentation (Toulmin)
 with tab_toulmin:
-    render_toulmin_tab(texte_source)
+    render_toulmin_tab(
+        texte_source,
+        texte_source_2=texte_source_2,
+        heading_discours_1=libelle_discours_1,
+        heading_discours_2=libelle_discours_2,
+        couleur_discours_1=couleur_discours_1,
+        couleur_discours_2=couleur_discours_2,
+    )
 
 # Onglet 3 : conditions logiques : si/alors
 with tab_conditions:
