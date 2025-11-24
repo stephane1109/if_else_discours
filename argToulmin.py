@@ -336,9 +336,13 @@ def render_toulmin_tab(
     with st.expander("Lexiques utilisés (argumToulmin.json)", expanded=False):
         st.json(lexiques_toulmin, expanded=False)
 
-    if texte_source_2 and texte_source_2.strip():
-        tab_disc1, tab_disc2 = st.tabs([heading_discours_1, heading_discours_2])
-        with tab_disc1:
+    has_disc1 = bool(texte_source and texte_source.strip())
+    has_disc2 = bool(texte_source_2 and texte_source_2.strip())
+
+    if has_disc1 and has_disc2:
+        st.markdown("#### Analyses des deux discours")
+        col1, col2 = st.columns(2)
+        with col1:
             _render_toulmin_analysis(
                 texte_source,
                 lexiques_toulmin,
@@ -346,7 +350,7 @@ def render_toulmin_tab(
                 key_prefix="disc1_",
                 couleur_heading=couleur_discours_1,
             )
-        with tab_disc2:
+        with col2:
             _render_toulmin_analysis(
                 texte_source_2,
                 lexiques_toulmin,
@@ -354,11 +358,19 @@ def render_toulmin_tab(
                 key_prefix="disc2_",
                 couleur_heading=couleur_discours_2,
             )
-    else:
+    elif has_disc1:
         _render_toulmin_analysis(
             texte_source,
             lexiques_toulmin,
             heading_discours_1,
             key_prefix="disc1_",
             couleur_heading=couleur_discours_1,
+        )
+    else:
+        _render_toulmin_analysis(
+            texte_source_2 or "",
+            lexiques_toulmin,
+            heading_discours_2,
+            key_prefix="disc2_",
+            couleur_heading=couleur_discours_2,
         )
