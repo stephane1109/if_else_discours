@@ -252,7 +252,7 @@ def graphique_barres_marqueurs_temps(
 def graphique_barres_familles_connecteurs(
     df_conn: pd.DataFrame,
 ):
-    """Construit un graphique de la répartition des connecteurs par famille."""
+    """Construit un graphique de la répartition des Connecteurs logiques par famille."""
 
     if df_conn is None or df_conn.empty:
         return None
@@ -304,10 +304,10 @@ def render_stats_tab(
     df_tensions: pd.DataFrame,
 ) -> None:
     """Affiche les statistiques des marqueurs dans l'onglet Streamlit dédié."""
-    st.subheader("Familles de connecteurs")
+    st.subheader("Familles de Connecteurs logiques")
     chart_familles_conn = graphique_barres_familles_connecteurs(df_conn)
     if chart_familles_conn is None:
-        st.info("Aucun connecteur détecté pour générer la répartition par famille.")
+        st.info("Aucun Connecteur logique détecté pour générer la répartition par famille.")
     else:
         st.altair_chart(chart_familles_conn, use_container_width=True)
 
