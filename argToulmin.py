@@ -221,17 +221,11 @@ def _render_stats(texte_source: str, df_toulmin: pd.DataFrame) -> None:
         st.dataframe(repartition[["Catégorie (FR / EN)", "compte", "part_%"]], use_container_width=True, hide_index=True)
 
         # Graphique de répartition
-        couleurs = [
-            PALETTE_TOULMIN.get(cat_norm, {"fg": "#6b7280"}).get("fg", "#6b7280")
-            for cat_norm in repartition["categorie_norm"]
-        ]
         chart_data = repartition.rename(columns={"compte": "Occurrences"})
-        chart_data["Couleur"] = couleurs
         st.bar_chart(
             chart_data,
             x="Catégorie (FR / EN)",
             y="Occurrences",
-            color="Couleur",
         )
 
 
