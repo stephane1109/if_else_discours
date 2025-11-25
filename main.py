@@ -849,7 +849,10 @@ if not GV_OK:
 with st.sidebar:
     st.header("Méthodes d’analyse")
     use_regex_cc = st.checkbox("Dictionnaire json (règles Regex)", value=True)
-    use_spacy_cc = st.checkbox("Dictionnaire NLP (Spacy)", value=SPACY_OK)
+    use_spacy_cc = st.checkbox("Dictionnaire NLP (Spacy)", value=False)
+    use_spacy_dev_cc = st.checkbox("Dictionnaire NLP (SpaCy) - en cours de dév", value=False)
+    if use_spacy_dev_cc:
+        st.caption("Fonctionnalité spaCy en cours de développement.")
 
 # Source du discours
 st.markdown("### Source du discours")
