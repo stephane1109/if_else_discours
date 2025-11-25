@@ -849,10 +849,12 @@ if not GV_OK:
 with st.sidebar:
     st.header("Méthodes d’analyse")
     use_regex_cc = st.checkbox("Dictionnaire json (règles Regex)", value=True)
-    use_spacy_cc = st.checkbox("Dictionnaire NLP (Spacy)", value=False)
     use_spacy_dev_cc = st.checkbox("Dictionnaire NLP (SpaCy) - en cours de dév", value=False)
     if use_spacy_dev_cc:
         st.caption("Fonctionnalité spaCy en cours de développement.")
+
+# La méthode spaCy principale est désactivée (case supprimée de l’interface)
+use_spacy_cc = False
 
 # Source du discours
 st.markdown("### Source du discours")
@@ -1292,7 +1294,7 @@ with tab_comparatif:
         elif use_spacy_cc and not SPACY_OK:
             st.warning("spaCy FR indisponible (installez un modèle français, par exemple 'fr_core_news_md').")
         else:
-            st.info("spaCy désactivé (voir la barre latérale).")
+            st.info("Analyse spaCy désactivée.")
 
 # Onglet 5 : Co-occurrences
 with tab_cooc:
