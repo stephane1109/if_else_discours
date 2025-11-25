@@ -15,6 +15,7 @@ from toulmin import (
     normaliser_texte,
     segmenter_phrases,
 )
+from streamlit_utils import dataframe_safe
 
 
 TOULMIN_DEFINITIONS: Dict[str, str] = {
@@ -218,7 +219,11 @@ def _render_stats(texte_source: str, df_toulmin: pd.DataFrame) -> None:
             .rename(columns={"categorie_label": "Catégorie (FR / EN)"})
         )
         repartition["part_%"] = repartition["compte"].div(total).mul(100).round(1)
-        st.dataframe(repartition[["Catégorie (FR / EN)", "compte", "part_%"]], use_container_width=True, hide_index=True)
+        dataframe_safe(
+            repartition[["Catégorie (FR / EN)", "compte", "part_%"]],
+            use_container_width=True,
+            hide_index=True,
+        )
 
         # Graphique de répartition
         chart_data = repartition.rename(columns={"compte": "Occurrences"})
@@ -264,7 +269,7 @@ def _render_toulmin_analysis(
             }
         )[["Phrase #", "Catégorie (FR / EN)", "Marqueur", "Phrase"]]
 
-        st.dataframe(df_affichage, use_container_width=True, hide_index=True)
+        dataframe_safe(df_affichage, use_container_width=True, hide_index=True)
         st.download_button(
             "Exporter les occurrences (CSV)",
             data=df_affichage.to_csv(index=False).encode("utf-8"),

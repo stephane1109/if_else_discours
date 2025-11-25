@@ -7,6 +7,8 @@ from dataclasses import dataclass
 import pandas as pd
 import streamlit as st
 
+from streamlit_utils import dataframe_safe
+
 _WORD_PATTERN = re.compile(r"[A-Za-zÀ-ÖØ-öø-ÿ']+")
 _SI_PATTERN = re.compile(r"(?<![A-Za-zÀ-ÖØ-öø-ÿ'])si(?![A-Za-zÀ-ÖØ-öø-ÿ'])", flags=re.IGNORECASE)
 _SI_ALORS_PATTERN = re.compile(r"\bsi\b[\s\S]{0,400}?\balors\b", flags=re.IGNORECASE)
@@ -325,7 +327,7 @@ def _render_stats_norm_block(
             continue
 
         df_section = _fabrique_tableau(resultats)
-        st.dataframe(df_section, use_container_width=True, hide_index=True)
+        dataframe_safe(df_section, use_container_width=True, hide_index=True)
 
     st.caption(
         "Les ratios sont calculés en divisant le nombre d’occurrences par le volume total de mots, "

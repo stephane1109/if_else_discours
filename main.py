@@ -44,6 +44,7 @@ from cooccurrences import render_cooccurrences_tab
 from conditions_spacy import analyser_conditions_spacy
 from argToulmin import render_toulmin_tab
 from lexique import render_lexique_tab
+from streamlit_utils import dataframe_safe
 
 BASE_DIR = Path(__file__).resolve().parent
 DICTIONNAIRES_DIR = BASE_DIR / "dictionnaires"
@@ -1052,7 +1053,7 @@ with tab_mapping:
     else:
         df_map = pd.DataFrame(sorted([(k, v) for k, v in DICO_CONNECTEURS.items()], key=lambda x: (x[1], x[0])),
                               columns=["expression_française", "famille_python"])
-        st.dataframe(df_map, use_container_width=True, hide_index=True)
+        dataframe_safe(df_map, use_container_width=True, hide_index=True)
         st.download_button("Exporter le mappage (CSV)",
                            data=df_map.to_csv(index=False).encode("utf-8"),
                            file_name="mapping_connecteurs_logiques.csv", mime="text/csv",
@@ -1175,7 +1176,7 @@ with tab_conditions:
                     "Aucune structure conditionnelle n'a été identifiée par spaCy."
                 )
             else:
-                st.dataframe(
+                dataframe_safe(
                     df_conditions_spacy,
                     use_container_width=True,
                     hide_index=True,
@@ -1204,7 +1205,7 @@ with tab_comparatif:
                 st.info("Aucune CAUSE trouvée par Regex.")
             else:
                 df_view_cause = table_regex_df(df_causes_lex, "CAUSE")
-                st.dataframe(df_view_cause, use_container_width=True, hide_index=True)
+                dataframe_safe(df_view_cause, use_container_width=True, hide_index=True)
 
         st.markdown("---")
 
@@ -1217,7 +1218,7 @@ with tab_comparatif:
                 st.info("Aucune CONSEQUENCE trouvée par Regex.")
             else:
                 df_view_consq = table_regex_df(df_consq_lex, "CONSEQUENCE")
-                st.dataframe(df_view_consq, use_container_width=True, hide_index=True)
+                dataframe_safe(df_view_consq, use_container_width=True, hide_index=True)
 
         st.markdown("---")
 
@@ -1234,7 +1235,7 @@ with tab_comparatif:
                 st.info("Aucun lien trouvé par spaCy (selon les ancres fournies).")
             else:
                 df_spacy_view = table_spacy_df(df_cc_spacy)
-                st.dataframe(df_spacy_view, use_container_width=True, hide_index=True)
+                dataframe_safe(df_spacy_view, use_container_width=True, hide_index=True)
                 st.download_button(
                     "Exporter CAUSE → CONSÉQUENCE (CSV)",
                     data=df_spacy_view.to_csv(index=False).encode("utf-8"),

@@ -15,6 +15,7 @@ from typing import Iterable, List, Optional
 import altair as alt
 import pandas as pd
 import streamlit as st
+from streamlit_utils import dataframe_safe
 
 try:  # pragma: no cover - dépendance optionnelle à l'import
     from wordcloud import WordCloud
@@ -428,7 +429,7 @@ def render_cooccurrences_tab(texte_source: str) -> None:
         "### Co-occurrences associées à « "
         f"{html.escape(mot_cle_analyse)} »"
     )
-    st.dataframe(
+    dataframe_safe(
         df_filtre[["mot_associe", "pair", "occurrences"]]
         .rename(columns={"mot_associe": "Mot associé"}),
         use_container_width=True,
