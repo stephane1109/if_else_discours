@@ -46,6 +46,7 @@ from lexique import render_lexique_tab
 from afc import render_afc_tab
 from streamlit_utils import dataframe_safe
 from text_utils import normaliser_espace, segmenter_en_phrases
+from annotations import render_annotation_tab
 
 BASE_DIR = Path(__file__).resolve().parent
 DICTIONNAIRES_DIR = BASE_DIR / "dictionnaires"
@@ -941,6 +942,7 @@ libelle_discours_2 = (
     tab_mapping,
     tab_lexique,
     tab_comparatif,
+    tab_annot,
 ) = st.tabs(
     [
         "Analyses",
@@ -954,6 +956,7 @@ libelle_discours_2 = (
         "Expressions mappées",
         "Lexique",
         "Comparatif règles Regex vs Spacy",
+        "Annot",
     ]
 )
 
@@ -1229,6 +1232,10 @@ with tab_comparatif:
             st.warning("spaCy FR indisponible (installez un modèle français, par exemple 'fr_core_news_md').")
         else:
             st.info("Analyse spaCy désactivée.")
+
+# Onglet Annot (création de dictionnaires à partir de surlignages)
+with tab_annot:
+    render_annotation_tab()
 
 # Onglet 5 : Statistiques sur les marqueurs
 with tab_stats:
