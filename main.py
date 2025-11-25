@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 # main.py — Discours → Code (SI / ALORS / SINON / TANT QUE) + Marqueurs + Causes/Conséquences
+# Ce script vise à détecter des connecteurs logiques et des marqueurs spécifiques dans le discours.
+# Il est d’autant plus pertinent lorsqu’il est appliqué à plusieurs discours d’un même auteur ou locuteur prononcés dans des contextes différents.
 # Méthodes comparées : Regex vs spaCy (modèle moyen si disponible)
 #
 # Fichiers requis dans le sous-répertoire dictionnaires/ (à côté de ce script) :
