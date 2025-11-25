@@ -1057,6 +1057,9 @@ with tab_mapping:
 
 # Onglet Lexique
 with tab_lexique:
+    st.markdown(
+        """Ce script réalise une analyse automatique de discours en s’appuyant sur la logique conditionnelle de la programmation (notamment Python). Il parcourt le corpus puis applique une série de règles de type « SI… ALORS… SINON… TANT QUE » afin de catégoriser le texte selon ces logiques discursives."""
+    )
     st.markdown("#### Lexique des termes clés")
     st.markdown(
         "- **APODOSE** : Proposition principale qui, placée après une subordonnée conditionnelle (protase), en indique la conséquence. Exemple : *Si j’insiste* (protase), *il viendra* (apodose)."
