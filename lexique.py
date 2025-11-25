@@ -5,7 +5,7 @@ import streamlit as st
 
 def render_lexique_tab() -> None:
     """Affiche le contenu de l'onglet Lexique."""
-    st.markdown("#### Connecteurs logique")
+    st.markdown("#### Connecteurs logique (façon python!)")
     st.markdown(
         dedent(
             """Ce script réalise une analyse automatique de discours en s’appuyant sur la logique conditionnelle de la
@@ -20,10 +20,10 @@ def render_lexique_tab() -> None:
         "- **WHILE (tant que)** : action répétée tant qu’une condition reste vraie, marque une persistance.\n"
     )
 
-    st.markdown("#### Marqueurs")
+    st.markdown("#### Marqueurs normatifs")
     st.markdown(
         dedent(
-            """Le dictionnaire « Marqueurs » regroupe l’ensemble des formes linguistiques et expressions récurrentes qui
+            """Le dictionnaire « Marqueurs normatifs » regroupe l’ensemble des formes linguistiques et expressions récurrentes qui
             signalent, dans le discours (politique), des prises de position normatives ou des cadrages spécifiques. Le script
             identifie automatiquement, dans le texte, les moments où l’orateur formule une obligation, une interdiction, une
             permission, une recommandation, une sanction, ou encore ouvre ou clôt un cadre discursif."""
@@ -42,10 +42,6 @@ def render_lexique_tab() -> None:
     st.markdown(
         "Les dictionnaires « Causes » et « Conséquences ». Ces dictionnaires rassemblent les expressions, connecteurs et constructions syntaxiques qui signalent dans le discours des relations de causalité (ce qui produit, motive ou explique) et des relations de conséquence (ce qui résulte, découle ou est présenté comme l’effet d’une cause)."
     )
-    st.markdown("#### Lexique des termes clés")
-    st.markdown(
-        "- **APODOSE** : Proposition principale qui, placée après une subordonnée conditionnelle (protase), en indique la conséquence. Exemple : *Si j’insiste* (protase), *il viendra* (apodose)."
-    )
 
     st.markdown("#### Relations causales")
     st.markdown(
@@ -54,6 +50,9 @@ def render_lexique_tab() -> None:
     )
 
     st.markdown("#### Marqueurs \"mémoire\" (cognitifs)")
+    st.markdown(
+        "Les marqueurs de « mémoire » (cognitifs) désignent l’ensemble des formes linguistiques par lesquelles le discours mobilise, organise ou oriente le rapport au passé, au souvenir et à l’expérience collective. Dans le cadre d’un discours politique, ces marqueurs signalent les moments où l’orateur convoque des événements antérieurs, des références historiques, des expériences partagées ou des promesses déjà formulées, afin de structurer la compréhension du présent et d’orienter les attentes futures."
+    )
     st.markdown(
         "- **MEM_PERS** : souvenirs ou expériences personnelles mobilisés dans le discours.\n"
         "- **MEM_COLL** : mémoire partagée, appel au « nous » collectif.\n"
