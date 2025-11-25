@@ -15,7 +15,7 @@ from typing import Iterable, List, Optional
 import altair as alt
 import pandas as pd
 import streamlit as st
-from streamlit_utils import dataframe_safe
+from streamlit_utils import chart_to_png_bytes, dataframe_safe, slugify_filename_component
 
 try:  # pragma: no cover - dépendance optionnelle à l'import
     from wordcloud import WordCloud
@@ -347,13 +347,15 @@ def _filtrer_cooccurrences_par_mot_cle(df: pd.DataFrame, mot_cle: str) -> pd.Dat
     return df_filtre
 
 
-def render_cooccurrences_tab(texte_source: str) -> None:
+def render_cooccurrences_tab(texte_source: str, nom_discours: str | None = None) -> None:
     """Affiche l'onglet Streamlit consacré aux co-occurrences par mot-clé."""
     st.subheader("Analyse des co-occurrences par mot-clé")
 
     if not texte_source or not texte_source.strip():
         st.info("Saisissez ou chargez un texte pour analyser les co-occurrences.")
         return
+
+    slug_discours = slugify_filename_component(nom_discours or "discours")
 
     longueur_min = st.slider(
         "Longueur minimale des mots (en caractères)",
@@ -456,6 +458,16 @@ def render_cooccurrences_tab(texte_source: str) -> None:
     chart_barres = _graphique_barres_cooccurrences(df_filtre, top_n)
     if chart_barres is not None:
         st.altair_chart(chart_barres, use_container_width=True)
+        png_bytes = chart_to_png_bytes(chart_barres)
+        if png_bytes:
+            fichier = f"cooccurrences_{slug_discours}.png"
+            st.download_button(
+                "Télécharger le graphique (PNG)",
+                data=png_bytes,
+                file_name=fichier,
+                mime="image/png",
+                key="dl_cooc_barres_png",
+            )
     else:
         st.caption("Pas de graphique disponible pour les paramètres sélectionnés.")
 

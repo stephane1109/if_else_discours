@@ -9,3 +9,4 @@ altair>=5.0
 wordcloud>=1.9
 # NumPy/BLAS stables sur Streamlit Cloud
 numpy==1.26.4
+vl-convert-python>=1.6.0

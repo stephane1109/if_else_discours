@@ -4,9 +4,11 @@ from __future__ import annotations
 import re
 from typing import List, Optional
 
+import altair as alt
 import pandas as pd
 import streamlit as st
-import altair as alt
+
+from streamlit_utils import chart_to_png_bytes, dataframe_safe, slugify_filename_component
 
 
 def _segmenter_en_phrases_local(texte: str) -> List[str]:
@@ -338,6 +340,17 @@ def _render_stats_block(
         st.info("Aucun Connecteur logique détecté pour générer la répartition par famille.")
     else:
         st.altair_chart(chart_familles_conn, use_container_width=True)
+        png_bytes = chart_to_png_bytes(chart_familles_conn)
+        if png_bytes:
+            titre = slugify_filename_component(heading or "discours")
+            fichier = f"repartition_connecteurs_{titre}.png"
+            st.download_button(
+                "Télécharger le graphique (PNG)",
+                data=png_bytes,
+                file_name=fichier,
+                mime="image/png",
+                key=f"{key_prefix}dl_familles_conn_png",
+            )
 
     st.markdown("---")
 
@@ -424,6 +437,17 @@ def _render_stats_block(
                 st.info("Rien à afficher avec les données disponibles.")
             else:
                 st.altair_chart(chart_marqueurs_temps, use_container_width=True)
+                png_bytes = chart_to_png_bytes(chart_marqueurs_temps)
+                if png_bytes:
+                    titre = slugify_filename_component(heading or "discours")
+                    fichier = f"frequence_marqueurs_{titre}.png"
+                    st.download_button(
+                        "Télécharger le graphique (PNG)",
+                        data=png_bytes,
+                        file_name=fichier,
+                        mime="image/png",
+                        key=f"{key_prefix}dl_marqueurs_freq_png",
+                    )
 
         st.markdown("---")
 
@@ -466,6 +490,17 @@ def _render_stats_block(
             st.caption(
                 "Chaque point représente une occurrence détectée, positionnée en pourcentage du texte."
             )
+            png_bytes = chart_to_png_bytes(chart)
+            if png_bytes:
+                titre = slugify_filename_component(heading or "discours")
+                fichier = f"chronologie_marqueurs_{titre}.png"
+                st.download_button(
+                    "Télécharger le graphique (PNG)",
+                    data=png_bytes,
+                    file_name=fichier,
+                    mime="image/png",
+                    key=f"{key_prefix}dl_chronologie_png",
+                )
 
 
 def render_stats_tab(
