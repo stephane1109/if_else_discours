@@ -43,7 +43,6 @@ def render_lexique_tab() -> None:
         "Les dictionnaires « Causes » et « Conséquences ». Ces dictionnaires rassemblent les expressions, connecteurs et constructions syntaxiques qui signalent dans le discours des relations de causalité (ce qui produit, motive ou explique) et des relations de conséquence (ce qui résulte, découle ou est présenté comme l’effet d’une cause)."
     )
 
-    st.markdown("#### Relations causales")
     st.markdown(
         "- **CAUSE** : justifie ou explique un fait (parce que, car, en raison de…).\n"
         "- **CONSEQUENCE** : en déduit l’effet ou l’issue (donc, alors, par conséquent…)."
