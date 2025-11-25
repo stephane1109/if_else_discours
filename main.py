@@ -40,7 +40,6 @@ from import_exp import dictionnaire_to_bytes, parse_uploaded_dictionary
 
 from stats import render_stats_tab
 from stats_norm import render_stats_norm_tab
-from cooccurrences import render_cooccurrences_tab
 from conditions_spacy import analyser_conditions_spacy
 from argToulmin import render_toulmin_tab
 from lexique import render_lexique_tab
@@ -951,7 +950,6 @@ libelle_discours_2 = (
     tab_detections,
     tab_conditions,
     tab_comparatif,
-    tab_cooc,
     tab_stats,
     tab_stats_norm,
     tab_discours,
@@ -964,7 +962,6 @@ libelle_discours_2 = (
         "Analyses",
         "conditions logiques : si/alors",
         "Comparatif Regex / spaCy",
-        "Co-occurrences",
         "Stats",
         "Stats norm",
         "2 discours",
@@ -1248,11 +1245,7 @@ with tab_comparatif:
         else:
             st.info("Analyse spaCy désactivée.")
 
-# Onglet 5 : Co-occurrences
-with tab_cooc:
-    render_cooccurrences_tab(texte_source)
-
-# Onglet 6 : Statistiques sur les marqueurs
+# Onglet 5 : Statistiques sur les marqueurs
 with tab_stats:
     render_stats_tab(
         texte_source,
