@@ -2,7 +2,7 @@
 # main.py — Discours → Code (SI / ALORS / SINON / TANT QUE) + Marqueurs + Causes/Conséquences
 # Méthodes comparées : Regex vs spaCy (modèle moyen si disponible)
 #
-# Fichiers requis à la racine (même dossier que ce script) :
+# Fichiers requis dans le sous-répertoire dictionnaires/ (à côté de ce script) :
 #   - conditions.json        : mapping des segments conditionnels → CONDITION / ALORS / WHILE
 #   - alternatives.json      : déclencheurs d’alternative → "ALTERNATIVE"
 #   - dict_marqueurs.json    : marqueurs normatifs (OBLIGATION/INTERDICTION/…)
@@ -20,6 +20,7 @@ import re
 import json
 import html
 import copy
+from pathlib import Path
 import pandas as pd
 import streamlit as st
 from typing import List, Dict, Tuple, Any, Optional
@@ -40,6 +41,9 @@ from stats_norm import render_stats_norm_tab
 from cooccurrences import render_cooccurrences_tab
 from conditions_spacy import analyser_conditions_spacy
 from argToulmin import render_toulmin_tab
+
+BASE_DIR = Path(__file__).resolve().parent
+DICTIONNAIRES_DIR = BASE_DIR / "dictionnaires"
 
 # =========================
 # Détection Graphviz (pour export JPEG)
@@ -239,16 +243,17 @@ def _expressions_par_etiquette(dico: Dict[str, str], etiquette: str) -> List[str
     return [k for k, v in dico.items() if str(v).upper() == cible]
 
 # =========================
-# Chargement JSON à la racine
+# Chargement des dictionnaires JSON (dossier dictionnaires/)
 # =========================
-def charger_json_dico(chemin: str) -> Dict[str, str]:
+def charger_json_dico(chemin: os.PathLike[str] | str) -> Dict[str, str]:
     """Charge un JSON dict { expression: etiquette } ; normalise les clés côté détection."""
-    if not os.path.isfile(chemin):
-        raise FileNotFoundError(f"Fichier introuvable : {chemin}")
-    with open(chemin, "r", encoding="utf-8") as f:
+    path = Path(chemin)
+    if not path.is_file():
+        raise FileNotFoundError(f"Fichier introuvable : {path}")
+    with path.open("r", encoding="utf-8") as f:
         data = json.load(f)
     if not isinstance(data, dict):
-        raise ValueError(f"Format JSON non supporté (attendu dict) : {chemin}")
+        raise ValueError(f"Format JSON non supporté (attendu dict) : {path}")
     return {normaliser_espace(k.lower()): str(v).upper() for k, v in data.items() if k and str(k).strip()}
 
 def charger_dicos_conditions() -> Tuple[
@@ -261,14 +266,17 @@ def charger_dicos_conditions() -> Tuple[
     Dict[str, str],
 ]:
     """Charge les dictionnaires nécessaires au modèle SI / ALORS / SINON."""
-    cwd = os.getcwd()
-    d_cond = charger_json_dico(os.path.join(cwd, "conditions.json"))
-    d_alt = charger_json_dico(os.path.join(cwd, "alternatives.json"))
-    d_marq = charger_json_dico(os.path.join(cwd, "dict_marqueurs.json"))
-    d_cons = charger_json_dico(os.path.join(cwd, "consequences.json"))
-    d_caus = charger_json_dico(os.path.join(cwd, "causes.json"))
-    d_mem = charger_json_dico(os.path.join(cwd, "souvenirs.json"))
-    d_tension = charger_json_dico(os.path.join(cwd, "tension_semantique.json"))
+    if not DICTIONNAIRES_DIR.is_dir():
+        raise FileNotFoundError(
+            f"Répertoire introuvable : {DICTIONNAIRES_DIR}"
+        )
+    d_cond = charger_json_dico(DICTIONNAIRES_DIR / "conditions.json")
+    d_alt = charger_json_dico(DICTIONNAIRES_DIR / "alternatives.json")
+    d_marq = charger_json_dico(DICTIONNAIRES_DIR / "dict_marqueurs.json")
+    d_cons = charger_json_dico(DICTIONNAIRES_DIR / "consequences.json")
+    d_caus = charger_json_dico(DICTIONNAIRES_DIR / "causes.json")
+    d_mem = charger_json_dico(DICTIONNAIRES_DIR / "souvenirs.json")
+    d_tension = charger_json_dico(DICTIONNAIRES_DIR / "tension_semantique.json")
     return d_cond, d_alt, d_marq, d_cons, d_caus, d_mem, d_tension
 
 # =========================
@@ -766,7 +774,11 @@ def table_spacy_df(df_spacy: pd.DataFrame) -> pd.DataFrame:
 # =========================
 # Interface Streamlit
 # =========================
-st.set_page_config(page_title="Discours → Code (Regex vs spaCy + JSON racine)", page_icon=None, layout="wide")
+st.set_page_config(
+    page_title="Discours → Code (Regex vs spaCy + dictionnaires JSON)",
+    page_icon=None,
+    layout="wide",
+)
 st.markdown(css_checkboxes_alignment(), unsafe_allow_html=True)
 st.title("Discours → Code : SI / ALORS / SINON / TANT QUE + marqueurs + causes/conséquences (Regex vs spaCy)")
 st.markdown("[www.codeandcortex.fr](https://www.codeandcortex.fr)")
@@ -784,11 +796,11 @@ try:
         DICO_TENSIONS,
     ) = charger_dicos_conditions()
 except Exception as e:
-    st.error("Impossible de charger les dictionnaires JSON à la racine.")
+    st.error("Impossible de charger les dictionnaires JSON depuis le dossier 'dictionnaires/'.")
     st.code(str(e))
     st.stop()
 
-DICOS_RACINE = {
+DICOS_REFERENCE = {
     "conditions": copy.deepcopy(DICO_CONDITIONS),
     "alternatives": copy.deepcopy(DICO_ALTERNATIVES),
     "marqueurs": copy.deepcopy(DICO_MARQUEURS),
@@ -800,7 +812,7 @@ DICOS_RACINE = {
 
 # Session State : dictionnaires actifs (peuvent être remplacés par un import JSON)
 if "dicos_actifs" not in st.session_state:
-    st.session_state["dicos_actifs"] = copy.deepcopy(DICOS_RACINE)
+    st.session_state["dicos_actifs"] = copy.deepcopy(DICOS_REFERENCE)
 
 dicos_actifs = st.session_state["dicos_actifs"]
 DICO_CONDITIONS = dicos_actifs.get("conditions", {})
@@ -929,10 +941,10 @@ libelle_discours_2 = (
     tab_stats,
     tab_stats_norm,
     tab_discours,
+    tab_toulmin,
     tab_dicos,
     tab_mapping,
     tab_lexique,
-    tab_toulmin,
 ) = st.tabs(
     [
         "Analyses",
@@ -942,10 +954,10 @@ libelle_discours_2 = (
         "Stats",
         "Stats norm",
         "2 discours",
+        "Arg Toulmin",
         "Dictionnaires (JSON)",
         "Expressions mappées",
         "Lexique",
-        "Arg Toulmin",
     ]
 )
 
@@ -966,9 +978,10 @@ with tab_detections:
 
 # Onglet Dictionnaires (JSON)
 with tab_dicos:
-    st.subheader("Aperçu des dictionnaires chargés (racine)")
+    st.subheader("Aperçu des dictionnaires chargés (dossier 'dictionnaires/')")
     st.caption(
-        "Vous pouvez importer votre propre dictionnaire JSON, mais vous devez impérativement respecter le nom d’origine."
+        "Vous pouvez importer votre propre dictionnaire JSON (répertoire dictionnaires/),"
+        " mais vous devez impérativement respecter le nom d’origine."
     )
 
     def bloc_dictionnaire(
