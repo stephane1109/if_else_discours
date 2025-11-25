@@ -107,7 +107,7 @@ def _sync_label_checkboxes(labels: List[str]) -> None:
         st.session_state[new_key] = False
 
 
-def render_annotation_tab() -> None:
+def render_annotation_tab(texte_source: str) -> None:
     st.subheader("Annotation manuelle du texte")
     st.caption(
         "Définissez vos marqueurs, cochez le label souhaité, sélectionnez une portion du texte"
@@ -117,13 +117,20 @@ def render_annotation_tab() -> None:
     st.session_state.setdefault("annotation_labels", _default_labels())
     st.session_state.setdefault("annotations", [])
 
-    texte = st.text_area(
-        "Texte à annoter",
-        height=220,
-        key="texte_annotation",
-        help="Collez ici le passage que vous souhaitez surligner.",
-    )
+    texte = texte_source or ""
+    previous_text = st.session_state.get("annotation_plain_text")
+    if previous_text is not None and previous_text != texte:
+        st.session_state["annotations"] = []
+
     st.session_state["annotation_plain_text"] = texte
+
+    st.text_area(
+        "Texte à annoter",
+        value=texte,
+        height=220,
+        disabled=True,
+        help="Texte importé depuis la section 'Source du discours'.",
+    )
 
     with st.expander("Marqueurs disponibles", expanded=True):
         st.write(

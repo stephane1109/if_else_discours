@@ -1235,7 +1235,7 @@ with tab_comparatif:
 
 # Onglet Annot (création de dictionnaires à partir de surlignages)
 with tab_annot:
-    render_annotation_tab()
+    render_annotation_tab(texte_source)
 
 # Onglet 5 : Statistiques sur les marqueurs
 with tab_stats:
