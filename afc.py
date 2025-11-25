@@ -20,11 +20,7 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 
-def _get_text_utils():
-    # Import différé pour éviter les dépendances circulaires avec main.py
-    from main import normaliser_espace, segmenter_en_phrases  # type: ignore
-
-    return normaliser_espace, segmenter_en_phrases
+from text_utils import normaliser_espace, segmenter_en_phrases
 
 
 @dataclass
@@ -37,8 +33,6 @@ class Segment:
 
 
 def _construire_segments(texte: str, label_discours: str, mode: str) -> List[Segment]:
-    normaliser_espace, segmenter_en_phrases = _get_text_utils()
-
     texte_norm = normaliser_espace(texte)
     if not texte_norm:
         return []
@@ -105,6 +99,22 @@ def _table_contingence(
         lignes.append([cpt.get(col, 0) for col in toutes_colonnes])
         index.append(seg.label)
     return pd.DataFrame(lignes, index=index, columns=toutes_colonnes)
+
+
+def _heatmap_contingence(table: pd.DataFrame) -> alt.Chart:
+    table_reset = table.reset_index().rename(columns={"index": "Segment"})
+    data = table_reset.melt(id_vars="Segment", var_name="Variable", value_name="Comptage")
+    return (
+        alt.Chart(data)
+        .mark_rect()
+        .encode(
+            x=alt.X("Variable", sort=None),
+            y=alt.Y("Segment", sort=None),
+            color=alt.Color("Comptage", scale=alt.Scale(scheme="blues")),
+            tooltip=["Segment", "Variable", alt.Tooltip("Comptage", format="d")],
+        )
+        .properties(height=260)
+    )
 
 
 def _analyse_afc(table: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame, List[float]]:
@@ -322,6 +332,7 @@ def render_afc_tab(
 
     st.markdown("### Table de contingence")
     st.dataframe(table, use_container_width=True)
+    st.altair_chart(_heatmap_contingence(table), use_container_width=True)
     st.download_button(
         "Exporter la table (CSV)",
         data=table.to_csv().encode("utf-8"),

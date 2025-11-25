@@ -45,6 +45,7 @@ from argToulmin import render_toulmin_tab
 from lexique import render_lexique_tab
 from afc import render_afc_tab
 from streamlit_utils import dataframe_safe
+from text_utils import normaliser_espace, segmenter_en_phrases
 
 BASE_DIR = Path(__file__).resolve().parent
 DICTIONNAIRES_DIR = BASE_DIR / "dictionnaires"
@@ -106,25 +107,6 @@ except Exception as err:
     SPACY_OK = False
     NLP = None
     SPACY_STATUS.append(f"Import de spaCy impossible : {err}")
-
-# =========================
-# Utilitaires texte / regex
-# =========================
-def normaliser_espace(texte: str) -> str:
-    """Homogénéise espaces et apostrophes afin de stabiliser les recherches."""
-    if not texte:
-        return ""
-    t = texte.replace("’", "'").replace("`", "'")
-    t = re.sub(r"\s+", " ", t, flags=re.M)
-    return t.strip()
-
-def segmenter_en_phrases(texte: str) -> List[str]:
-    """Segmente approximativement en phrases sur ponctuation forte."""
-    if not texte:
-        return []
-    morceaux = re.split(r"(?<=[\.\!\?\:\;])\s+", texte)
-    return [m.strip() for m in morceaux if m and m.strip()]
-
 
 def _est_debut_segment(texte: str, index: int) -> bool:
     """Vérifie qu’un index correspond au début d’un segment (début ou précédé d’une ponctuation forte)."""
