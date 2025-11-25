@@ -1,0 +1,186 @@
+"""Onglet d'annotation interactive pour générer des dictionnaires JSON.
+
+Ce module propose une interface Streamlit permettant à l'utilisateur de :
+- définir ses propres labels (marqueurs) d'annotation ;
+- sélectionner des segments de texte à annoter via des bornes de positions ;
+- visualiser les surlignages directement dans l'application ;
+- exporter les annotations au format JSON.
+
+L'interface s'inspire de la librairie "streamlit-annotation-tools" tout en
+restant autonome (pas d'installation supplémentaire requise).
+"""
+from __future__ import annotations
+
+from dataclasses import dataclass
+import html
+import json
+from typing import Dict, List
+
+import streamlit as st
+
+
+_COLOR_PALETTE = [
+    "#fde68a",
+    "#bbf7d0",
+    "#bfdbfe",
+    "#fecdd3",
+    "#ddd6fe",
+    "#fbcfe8",
+    "#fed7aa",
+    "#c7d2fe",
+]
+
+
+@dataclass
+class Annotation:
+    label: str
+    start: int
+    end: int
+    text: str
+
+    def to_dict(self) -> Dict[str, str | int]:
+        return {
+            "label": self.label,
+            "start": self.start,
+            "end": self.end,
+            "text": self.text,
+        }
+
+
+@st.cache_data(show_spinner=False)
+def _default_labels() -> List[str]:
+    return ["Personne", "Organisation", "Lieu"]
+
+
+def _color_for_label(label: str, existing: Dict[str, str]) -> str:
+    if label in existing:
+        return existing[label]
+    color = _COLOR_PALETTE[len(existing) % len(_COLOR_PALETTE)]
+    existing[label] = color
+    return color
+
+
+def _render_highlighted_text(text: str, annotations: List[Annotation]) -> None:
+    if not text.strip():
+        st.info("Ajoutez d'abord un texte à annoter.")
+        return
+
+    if not annotations:
+        st.write(text)
+        return
+
+    annotations_sorted = sorted(annotations, key=lambda ann: ann.start)
+    cursor = 0
+    label_colors: Dict[str, str] = {}
+    html_parts: List[str] = []
+    plain_text = st.session_state.get("annotation_plain_text", text)
+
+    for ann in annotations_sorted:
+        if ann.start > cursor:
+            html_parts.append(html.escape(plain_text[cursor:ann.start]))
+        color = _color_for_label(ann.label, label_colors)
+        highlighted = (
+            f"<span style='background:{color}; padding:2px 4px; border-radius:4px;'>"
+            f"{html.escape(ann.text)}</span>"
+        )
+        html_parts.append(highlighted)
+        cursor = ann.end
+
+    if cursor < len(text):
+        html_parts.append(html.escape(text[cursor:]))
+
+    st.markdown("".join(html_parts), unsafe_allow_html=True)
+
+
+def render_annotation_tab() -> None:
+    st.subheader("Annotation manuelle du texte")
+    st.caption(
+        "Définissez vos marqueurs, sélectionnez une portion du texte puis ajoutez l'annotation."
+        " Les annotations sont exportables au format JSON."
+    )
+
+    st.session_state.setdefault("annotation_labels", _default_labels())
+    st.session_state.setdefault("annotations", [])
+
+    texte = st.text_area(
+        "Texte à annoter",
+        height=220,
+        key="texte_annotation",
+        help="Collez ici le passage que vous souhaitez surligner.",
+    )
+    st.session_state["annotation_plain_text"] = texte
+
+    with st.expander("Marqueurs disponibles", expanded=True):
+        st.write(
+            "Ajoutez ou supprimez des labels. Ils seront proposés dans le menu déroulant d'annotation."
+        )
+        nouveau_label = st.text_input("Ajouter un label", placeholder="Ex : Concept", key="label_input")
+        cols = st.columns([1, 1])
+        with cols[0]:
+            if st.button("Ajouter le label", key="ajout_label"):
+                if nouveau_label.strip() and nouveau_label not in st.session_state["annotation_labels"]:
+                    st.session_state["annotation_labels"].append(nouveau_label.strip())
+                elif nouveau_label.strip():
+                    st.warning("Ce label existe déjà.")
+        with cols[1]:
+            if st.button("Réinitialiser les labels", key="reset_labels"):
+                st.session_state["annotation_labels"] = _default_labels()
+        if st.session_state["annotation_labels"]:
+            st.write("Labels actuels :")
+            st.write(", ".join(st.session_state["annotation_labels"]))
+        else:
+            st.info("Aucun label défini pour le moment.")
+
+    if texte.strip():
+        start, end = st.slider(
+            "Sélection du passage (positions en caractères)",
+            min_value=0,
+            max_value=len(texte),
+            value=(0, min(len(texte), 20)),
+            step=1,
+        )
+        label_selectionne = st.selectbox(
+            "Label associé",
+            options=st.session_state["annotation_labels"],
+            key="label_selection",
+        )
+        selection = texte[start:end]
+        st.markdown(
+            f"**Aperçu du surlignage** : {selection if selection else '(aucune sélection)'}"
+        )
+
+        if st.button("Ajouter l'annotation", key="ajouter_annotation"):
+            if end <= start:
+                st.error("La fin doit être supérieure au début de la sélection.")
+            elif not selection.strip():
+                st.error("Sélectionnez un passage non vide.")
+            else:
+                st.session_state["annotations"].append(
+                    Annotation(
+                        label=label_selectionne,
+                        start=start,
+                        end=end,
+                        text=selection,
+                    )
+                )
+                st.success("Annotation ajoutée.")
+
+    annotations: List[Annotation] = st.session_state.get("annotations", [])
+    if annotations:
+        st.markdown("### Aperçu des surlignages")
+        _render_highlighted_text(texte, annotations)
+
+        st.markdown("### Tableau des annotations")
+        df_data = [ann.to_dict() for ann in annotations]
+        st.dataframe(df_data, use_container_width=True)
+
+        json_payload = json.dumps(df_data, ensure_ascii=False, indent=2)
+        st.download_button(
+            "Télécharger les annotations (JSON)",
+            data=json_payload.encode("utf-8"),
+            file_name="annotations.json",
+            mime="application/json",
+            key="dl_annotations_json",
+        )
+    else:
+        st.info("Aucune annotation enregistrée pour le moment.")
