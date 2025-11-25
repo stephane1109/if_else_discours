@@ -348,8 +348,15 @@ def render_afc_tab(
         return
 
     inertie_totale = sum(eigvals)
-    inertie_dim1 = eigvals[0] / inertie_totale * 100 if eigvals else 0
-    inertie_dim2 = eigvals[1] / inertie_totale * 100 if len(eigvals) > 1 else 0
+    if inertie_totale > 0:
+        inertie_dim1 = eigvals[0] / inertie_totale * 100 if eigvals else 0
+        inertie_dim2 = eigvals[1] / inertie_totale * 100 if len(eigvals) > 1 else 0
+    else:
+        st.warning(
+            "Inertie totale nulle : impossible de calculer les contributions des dimensions."
+        )
+        inertie_dim1 = 0
+        inertie_dim2 = 0
 
     st.markdown(
         f"**Inertie** – Dim 1 : {inertie_dim1:.1f}% · Dim 2 : {inertie_dim2:.1f}%"
