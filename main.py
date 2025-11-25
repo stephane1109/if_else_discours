@@ -781,6 +781,11 @@ st.set_page_config(
 )
 st.markdown(css_checkboxes_alignment(), unsafe_allow_html=True)
 st.title("Discours → Code : SI / ALORS / SINON / TANT QUE + marqueurs + causes/conséquences (Regex vs spaCy)")
+st.caption(
+    "Vous pouvez récupérer deux fichiers texte (Discours de Politique Générale de Sébastien "
+    "Lecornu devant l'Assemblée Nationale et le Sénat) pour tester l'interface : "
+    "[répertoire exemples](https://github.com/stephane1109/if_else_discours/tree/main/exemples)."
+)
 st.markdown("[www.codeandcortex.fr](https://www.codeandcortex.fr)")
 st.write("")
 
