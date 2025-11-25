@@ -1057,8 +1057,14 @@ with tab_mapping:
 
 # Onglet Lexique
 with tab_lexique:
+    st.markdown("#### Connecteurs")
     st.markdown(
         """Ce script réalise une analyse automatique de discours en s’appuyant sur la logique conditionnelle de la programmation (notamment Python). Il parcourt le corpus puis applique une série de règles de type « SI… ALORS… SINON… TANT QUE » afin de catégoriser le texte selon ces logiques discursives."""
+    )
+
+    st.markdown("#### Marqueurs")
+    st.markdown(
+        """Le dictionnaire « Marqueurs » regroupe l’ensemble des formes linguistiques et expressions récurrentes qui signalent, dans le discours (politique), des prises de position normatives ou des cadrages spécifiques. Le script identifie automatiquement, dans le texte, les moments où l’orateur formule une obligation, une interdiction, une permission, une recommandation, une sanction, ou encore ouvre ou clôt un cadre discursif."""
     )
     st.markdown("#### Lexique des termes clés")
     st.markdown(
