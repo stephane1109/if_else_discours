@@ -14,6 +14,12 @@ def render_lexique_tab() -> None:
         )
     )
 
+    st.markdown(
+        "- **IF (si…)** : introduit une condition ; ce qui suit dépend du fait que la condition soit vraie.\n"
+        "- **ELSE (sinon)** : propose l’alternative quand la condition précédente n’est pas remplie.\n"
+        "- **WHILE (tant que)** : action répétée tant qu’une condition reste vraie, marque une persistance.\n"
+    )
+
     st.markdown("#### Marqueurs")
     st.markdown(
         dedent(
@@ -30,15 +36,6 @@ def render_lexique_tab() -> None:
     st.markdown("#### Lexique des termes clés")
     st.markdown(
         "- **APODOSE** : Proposition principale qui, placée après une subordonnée conditionnelle (protase), en indique la conséquence. Exemple : *Si j’insiste* (protase), *il viendra* (apodose)."
-    )
-
-    st.markdown("#### Connecteurs logiques (façon Python)")
-    st.markdown(
-        "- **IF (si…)** : introduit une condition ; ce qui suit dépend du fait que la condition soit vraie.\n"
-        "- **ELSE (sinon)** : propose l’alternative quand la condition précédente n’est pas remplie.\n"
-        "- **WHILE (tant que)** : action répétée tant qu’une condition reste vraie, marque une persistance.\n"
-        "- **AND (et)** : additionne ou exige plusieurs conditions/éléments à la fois.\n"
-        "- **OR (ou/soit)** : offre des alternatives ; au moins une suffit."
     )
 
     st.markdown("#### Marqueurs normatifs (prescription)")
