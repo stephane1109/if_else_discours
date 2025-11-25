@@ -6,7 +6,7 @@ import streamlit as st
 def render_lexique_tab() -> None:
     """Affiche le contenu de l'onglet Lexique."""
 
-    st.markdown("#### Intro...")
+    st.markdown("#### Intro")
     st.markdown(
         dedent(
             """Le script repose sur des dictionnaires au format JSON et sur un ensemble de règles regex, 
