@@ -124,13 +124,15 @@ def render_annotation_tab(texte_source: str) -> None:
 
     st.session_state["annotation_plain_text"] = texte
 
-    st.text_area(
-        "Texte à annoter",
-        value=texte,
-        height=220,
-        disabled=True,
-        help="Texte importé depuis la section 'Source du discours'.",
-    )
+    st.markdown("**Texte importé depuis la section 'Source du discours'**")
+    if texte.strip():
+        st.markdown(
+            "<div style='white-space:pre-wrap; border:1px solid #e0e0e0; padding:0.75rem; "
+            "border-radius:0.5rem; background:#fafafa;'>" + html.escape(texte) + "</div>",
+            unsafe_allow_html=True,
+        )
+    else:
+        st.info("Aucun texte importé pour le moment.")
 
     with st.expander("Marqueurs disponibles", expanded=True):
         st.write(
