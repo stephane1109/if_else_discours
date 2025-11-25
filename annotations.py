@@ -92,11 +92,26 @@ def _render_highlighted_text(text: str, annotations: List[Annotation]) -> None:
     st.markdown("".join(html_parts), unsafe_allow_html=True)
 
 
+def _sync_label_checkboxes(labels: List[str]) -> None:
+    """Nettoie les cases à cocher des labels supprimés et initialise les nouveaux."""
+    prefix = "annotation_label_"
+    current_keys = {key for key in st.session_state if key.startswith(prefix)}
+    valid_keys = {f"{prefix}{label}" for label in labels}
+
+    # Supprime les anciennes cases devenues obsolètes
+    for stale in current_keys - valid_keys:
+        st.session_state.pop(stale, None)
+
+    # Initialise explicitement les nouvelles cases à False si absentes
+    for new_key in valid_keys - current_keys:
+        st.session_state[new_key] = False
+
+
 def render_annotation_tab() -> None:
     st.subheader("Annotation manuelle du texte")
     st.caption(
-        "Définissez vos marqueurs, sélectionnez une portion du texte puis ajoutez l'annotation."
-        " Les annotations sont exportables au format JSON."
+        "Définissez vos marqueurs, cochez le label souhaité, sélectionnez une portion du texte"
+        " puis ajoutez l'annotation. Les annotations sont exportables au format JSON."
     )
 
     st.session_state.setdefault("annotation_labels", _default_labels())
@@ -112,7 +127,7 @@ def render_annotation_tab() -> None:
 
     with st.expander("Marqueurs disponibles", expanded=True):
         st.write(
-            "Ajoutez ou supprimez des labels. Ils seront proposés dans le menu déroulant d'annotation."
+            "Ajoutez ou supprimez des labels. Ils seront proposés comme cases à cocher pour l'annotation."
         )
         nouveau_label = st.text_input("Ajouter un label", placeholder="Ex : Concept", key="label_input")
         cols = st.columns([1, 1])
@@ -131,6 +146,8 @@ def render_annotation_tab() -> None:
         else:
             st.info("Aucun label défini pour le moment.")
 
+    _sync_label_checkboxes(st.session_state["annotation_labels"])
+
     if texte.strip():
         start, end = st.slider(
             "Sélection du passage (positions en caractères)",
@@ -139,31 +156,42 @@ def render_annotation_tab() -> None:
             value=(0, min(len(texte), 20)),
             step=1,
         )
-        label_selectionne = st.selectbox(
-            "Label associé",
-            options=st.session_state["annotation_labels"],
-            key="label_selection",
-        )
+
+        labels_actuels = st.session_state["annotation_labels"]
+        selection_checkbox = []
+        st.markdown("**Choisissez le label à appliquer :**")
+        for label in labels_actuels:
+            key = f"annotation_label_{label}"
+            selection_checkbox.append((label, st.checkbox(label, key=key)))
+
+        labels_selectionnes = [lab for lab, checked in selection_checkbox if checked]
+
         selection = texte[start:end]
         st.markdown(
             f"**Aperçu du surlignage** : {selection if selection else '(aucune sélection)'}"
         )
 
         if st.button("Ajouter l'annotation", key="ajouter_annotation"):
-            if end <= start:
+            if len(labels_selectionnes) == 0:
+                st.error("Sélectionnez d'abord un label via les cases à cocher.")
+            elif len(labels_selectionnes) > 1:
+                st.error("Ne cochez qu'un seul label à la fois pour l'annotation.")
+            elif end <= start:
                 st.error("La fin doit être supérieure au début de la sélection.")
             elif not selection.strip():
                 st.error("Sélectionnez un passage non vide.")
             else:
                 st.session_state["annotations"].append(
                     Annotation(
-                        label=label_selectionne,
+                        label=labels_selectionnes[0],
                         start=start,
                         end=end,
                         text=selection,
                     )
                 )
-                st.success("Annotation ajoutée.")
+                st.success(
+                    f"Annotation ajoutée avec le label '{labels_selectionnes[0]}'."
+                )
 
     annotations: List[Annotation] = st.session_state.get("annotations", [])
     if annotations:
