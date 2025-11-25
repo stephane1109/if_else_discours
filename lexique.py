@@ -29,16 +29,6 @@ def render_lexique_tab() -> None:
             permission, une recommandation, une sanction, ou encore ouvre ou clôt un cadre discursif."""
         )
     )
-    st.markdown("#### Marqueurs \"cause/conséquence\"")
-    st.markdown(
-        "Les dictionnaires « Causes » et « Conséquences ». Ces dictionnaires rassemblent les expressions, connecteurs et constructions syntaxiques qui signalent dans le discours des relations de causalité (ce qui produit, motive ou explique) et des relations de conséquence (ce qui résulte, découle ou est présenté comme l’effet d’une cause)."
-    )
-    st.markdown("#### Lexique des termes clés")
-    st.markdown(
-        "- **APODOSE** : Proposition principale qui, placée après une subordonnée conditionnelle (protase), en indique la conséquence. Exemple : *Si j’insiste* (protase), *il viendra* (apodose)."
-    )
-
-    st.markdown("#### Marqueurs normatifs (prescription)")
     st.markdown(
         "- **OBLIGATION** : ce qui doit être fait (nécessité, devoir).\n"
         "- **INTERDICTION** : ce qui ne doit pas être fait (empêchement, prohibition).\n"
@@ -47,6 +37,14 @@ def render_lexique_tab() -> None:
         "- **SANCTION** : annonce une punition ou un coût en cas d’écart.\n"
         "- **CADRE_OUVERTURE** : invite à débattre ou à élargir le dialogue.\n"
         "- **CADRE_FERMETURE** : clôt ou restreint le débat (pas le moment, pas de polémique)."
+    )
+    st.markdown("#### Marqueurs \"cause/conséquence\"")
+    st.markdown(
+        "Les dictionnaires « Causes » et « Conséquences ». Ces dictionnaires rassemblent les expressions, connecteurs et constructions syntaxiques qui signalent dans le discours des relations de causalité (ce qui produit, motive ou explique) et des relations de conséquence (ce qui résulte, découle ou est présenté comme l’effet d’une cause)."
+    )
+    st.markdown("#### Lexique des termes clés")
+    st.markdown(
+        "- **APODOSE** : Proposition principale qui, placée après une subordonnée conditionnelle (protase), en indique la conséquence. Exemple : *Si j’insiste* (protase), *il viendra* (apodose)."
     )
 
     st.markdown("#### Relations causales")
