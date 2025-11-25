@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import re
-from typing import List
+from typing import List, Optional
 
 import pandas as pd
 import streamlit as st
@@ -294,7 +294,26 @@ def graphique_barres_familles_connecteurs(
     return chart
 
 
-def render_stats_tab(
+def _normaliser_couleur(choix: Optional[str], valeur_par_defaut: str) -> str:
+    """Restreint les couleurs aux variantes rouge ou bleu pour les titres."""
+
+    if not choix:
+        return valeur_par_defaut
+
+    choix_min = choix.strip().lower()
+    couleurs_autorisees = {
+        "rouge": "#c00000",
+        "red": "#c00000",
+        "bleu": "#1f4e79",
+        "blue": "#1f4e79",
+        "#c00000": "#c00000",
+        "#1f4e79": "#1f4e79",
+    }
+
+    return couleurs_autorisees.get(choix_min, valeur_par_defaut)
+
+
+def _render_stats_block(
     texte_source: str,
     df_conn: pd.DataFrame,
     df_marqueurs: pd.DataFrame,
@@ -302,8 +321,17 @@ def render_stats_tab(
     df_consq_lex: pd.DataFrame,
     df_causes_lex: pd.DataFrame,
     df_tensions: pd.DataFrame,
+    heading: Optional[str] = None,
+    heading_color: Optional[str] = None,
+    key_prefix: str = "",
 ) -> None:
-    """Affiche les statistiques des marqueurs dans l'onglet Streamlit dédié."""
+    """Affiche les statistiques des marqueurs pour un discours donné."""
+    if heading:
+        couleur_titre = _normaliser_couleur(heading_color, heading_color or "#c00000")
+        st.markdown(
+            f'<span style="color:{couleur_titre}; font-weight:700;">{heading}</span>',
+            unsafe_allow_html=True,
+        )
     st.subheader("Familles de Connecteurs logiques")
     chart_familles_conn = graphique_barres_familles_connecteurs(df_conn)
     if chart_familles_conn is None:
@@ -421,6 +449,7 @@ def render_stats_tab(
         "Filtrer par famille/catégorie",
         options_familles,
         default=[],
+        key=f"{key_prefix}select_familles_chrono",
     )
 
     if df_temps.empty:
@@ -437,4 +466,59 @@ def render_stats_tab(
             st.caption(
                 "Chaque point représente une occurrence détectée, positionnée en pourcentage du texte."
             )
+
+
+def render_stats_tab(
+    texte_source: str,
+    df_conn: pd.DataFrame,
+    df_marqueurs: pd.DataFrame,
+    df_memoires: pd.DataFrame,
+    df_consq_lex: pd.DataFrame,
+    df_causes_lex: pd.DataFrame,
+    df_tensions: pd.DataFrame,
+    texte_source_2: Optional[str] = None,
+    df_conn_2: Optional[pd.DataFrame] = None,
+    df_marqueurs_2: Optional[pd.DataFrame] = None,
+    df_memoires_2: Optional[pd.DataFrame] = None,
+    df_consq_lex_2: Optional[pd.DataFrame] = None,
+    df_causes_lex_2: Optional[pd.DataFrame] = None,
+    df_tensions_2: Optional[pd.DataFrame] = None,
+    heading_discours_1: Optional[str] = None,
+    heading_discours_2: Optional[str] = None,
+    couleur_discours_1: Optional[str] = None,
+    couleur_discours_2: Optional[str] = None,
+) -> None:
+    """Affiche les statistiques des marqueurs dans l'onglet Streamlit dédié.
+
+    Lorsque deux discours sont fournis, les indicateurs sont présentés successivement
+    (discours 1 puis discours 2) avec les titres colorés.
+    """
+
+    _render_stats_block(
+        texte_source,
+        df_conn,
+        df_marqueurs,
+        df_memoires,
+        df_consq_lex,
+        df_causes_lex,
+        df_tensions,
+        heading=heading_discours_1,
+        heading_color=couleur_discours_1,
+        key_prefix="disc1_",
+    )
+
+    if texte_source_2 and texte_source_2.strip():
+        st.markdown("---")
+        _render_stats_block(
+            texte_source_2,
+            df_conn_2 if df_conn_2 is not None else pd.DataFrame(),
+            df_marqueurs_2 if df_marqueurs_2 is not None else pd.DataFrame(),
+            df_memoires_2 if df_memoires_2 is not None else pd.DataFrame(),
+            df_consq_lex_2 if df_consq_lex_2 is not None else pd.DataFrame(),
+            df_causes_lex_2 if df_causes_lex_2 is not None else pd.DataFrame(),
+            df_tensions_2 if df_tensions_2 is not None else pd.DataFrame(),
+            heading=heading_discours_2,
+            heading_color=couleur_discours_2,
+            key_prefix="disc2_",
+        )
 
