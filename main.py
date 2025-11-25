@@ -4,7 +4,7 @@
 # Il est d’autant plus pertinent lorsqu’il est appliqué à plusieurs discours d’un même auteur ou locuteur prononcés dans des contextes différents.
 # Méthodes comparées : Regex vs spaCy (modèle moyen si disponible)
 #
-# Fichiers requis dans le sous-répertoire dictionnaires/ (à côté de ce script) :
+# Fichiers requis dans le sous-répertoire dictionnaires/ :
 #   - conditions.json        : mapping des segments conditionnels → CONDITION / ALORS / WHILE
 #   - alternatives.json      : déclencheurs d’alternative → "ALTERNATIVE"
 #   - dict_marqueurs.json    : marqueurs normatifs (OBLIGATION/INTERDICTION/…)
