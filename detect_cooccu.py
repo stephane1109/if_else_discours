@@ -1,4 +1,6 @@
-import json, re
+import json
+import re
+from pathlib import Path
 from typing import List, Dict
 
 # --- utils ---
@@ -16,7 +18,10 @@ def any_match(compiled_patterns, text: str) -> bool:
     return any(p.search(text) for p in compiled_patterns)
 
 # --- charge le JSON ---
-with open("tension_semantique.json", "r", encoding="utf-8") as f:
+BASE_DIR = Path(__file__).resolve().parent
+with (BASE_DIR / "dictionnaires" / "tension_semantique.json").open(
+    "r", encoding="utf-8"
+) as f:
     TENS = json.load(f)
 
 USE_REGEX = bool(TENS.get("options", {}).get("patterns_are_regex", True))

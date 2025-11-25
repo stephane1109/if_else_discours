@@ -7,7 +7,8 @@ import re
 from pathlib import Path
 from typing import Dict, Iterable, List, Tuple, Any
 
-DEFAULT_JSON = Path(__file__).resolve().parent / "argumToulmin.json"
+BASE_DIR = Path(__file__).resolve().parent
+DEFAULT_JSON = BASE_DIR / "dictionnaires" / "argumToulmin.json"
 
 
 def normaliser_texte(texte: str) -> str:
@@ -33,7 +34,7 @@ def _motif_entier(expression: str) -> re.Pattern:
 
 
 def charger_lexiques_toulmin(json_path: Any = None) -> Dict[str, List[str]]:
-    """Charge le fichier JSON contenant les marqueurs (par défaut à la racine)."""
+    """Charge le fichier JSON contenant les marqueurs (par défaut dans dictionnaires/)."""
     path = Path(json_path) if json_path is not None else DEFAULT_JSON
     with open(path, "r", encoding="utf-8") as f:
         data = json.load(f)
