@@ -1261,6 +1261,17 @@ with tab_stats:
         df_consq_lex,
         df_causes_lex,
         df_tensions,
+        texte_source_2=texte_source_2,
+        df_conn_2=df_conn_2,
+        df_marqueurs_2=df_marq_2,
+        df_memoires_2=df_memoires_2,
+        df_consq_lex_2=df_consq_lex_2,
+        df_causes_lex_2=df_causes_lex_2,
+        df_tensions_2=df_tensions_2,
+        heading_discours_1=libelle_discours_1,
+        heading_discours_2=libelle_discours_2,
+        couleur_discours_1=couleur_discours_1,
+        couleur_discours_2=couleur_discours_2,
     )
 
 with tab_stats_norm:
