@@ -61,6 +61,17 @@ def render_lexique_tab() -> None:
         "- **MEM_PASSE** : ancrage explicite dans un temps passé (jadis, auparavant…)."
     )
 
+
+    st.markdown("#### Marqueurs Tensions sémantiques")
+    st.markdown(
+        "Les « tensions sémantiques » renvoient aux moments du discours où les significations sont ambivalentes. Dans un discours politique, ces tensions apparaissent lorsqu’un même segment associe des termes, des cadres ou des valeurs difficilement conciliables,"
+    )
+
+    st.markdown(
+        "- **CAUSE** : justifie ou explique un fait (parce que, car, en raison de…).\n"
+        "- **CONSEQUENCE** : en déduit l’effet ou l’issue (donc, alors, par conséquent…)."
+    )
+    
     st.markdown("#### Marqueurs \"si… alors / sinon\"")
     st.markdown(
         "- **CONDITION** : déclenche la condition (« si… », « à condition que… »).\n"
