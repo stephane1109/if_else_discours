@@ -150,7 +150,7 @@ def render_annotation_tab() -> None:
 
     if texte.strip():
         start, end = st.slider(
-            "Sélection du passage (positions en caractères)",
+            "Sélection du passage",
             min_value=0,
             max_value=len(texte),
             value=(0, min(len(texte), 20)),
