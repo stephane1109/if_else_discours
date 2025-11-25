@@ -730,7 +730,7 @@ def render_detection_section(
     use_regex_cc: bool = True,
     heading_color: Optional[str] = None,
 ):
-    """Affiche les résultats de détection pour un texte (onglet Détection)."""
+    """Affiche les résultats de détection pour un texte (onglet Analyses)."""
 
     df_conn = detections.get("df_conn", pd.DataFrame())
     df_marq = detections.get("df_marq", pd.DataFrame())
@@ -1474,7 +1474,7 @@ libelle_discours_2 = (
     tab_toulmin,
 ) = st.tabs(
     [
-        "Détections",
+        "Analyses",
         "conditions logiques : si/alors",
         "Comparatif Regex / spaCy",
         "Co-occurrences",
@@ -1488,7 +1488,7 @@ libelle_discours_2 = (
     ]
 )
 
-# Onglet Détections (listes + texte annoté)
+# Onglet Analyses (listes + texte annoté)
 with tab_detections:
     st.markdown(f"### {libelle_discours_1}")
     render_detection_section(
