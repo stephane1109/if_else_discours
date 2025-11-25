@@ -329,7 +329,7 @@ def _render_stats_block(
     if heading:
         couleur_titre = _normaliser_couleur(heading_color, heading_color or "#c00000")
         st.markdown(
-            f'<span style="color:{couleur_titre}; font-weight:700;">{heading}</span>',
+            f'<span style="color:{couleur_titre}; font-weight:700; font-size:26px;">{heading}</span>',
             unsafe_allow_html=True,
         )
     st.subheader("Familles de Connecteurs logiques")
