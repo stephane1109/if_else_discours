@@ -43,6 +43,7 @@ from stats_norm import render_stats_norm_tab
 from conditions_spacy import analyser_conditions_spacy
 from argToulmin import render_toulmin_tab
 from lexique import render_lexique_tab
+from afc import render_afc_tab
 from streamlit_utils import dataframe_safe
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -949,6 +950,7 @@ libelle_discours_2 = (
 (
     tab_detections,
     tab_conditions,
+    tab_afc,
     tab_stats,
     tab_stats_norm,
     tab_discours,
@@ -961,6 +963,7 @@ libelle_discours_2 = (
     [
         "Analyses",
         "conditions logiques : si/alors",
+        "AFC",
         "Stats",
         "Stats norm",
         "2 discours",
@@ -1266,6 +1269,16 @@ with tab_stats:
         heading_discours_2=libelle_discours_2,
         couleur_discours_1=couleur_discours_1,
         couleur_discours_2=couleur_discours_2,
+    )
+
+with tab_afc:
+    render_afc_tab(
+        texte_source,
+        texte_source_2,
+        detections_1,
+        detections_2,
+        libelle_discours_1,
+        libelle_discours_2,
     )
 
 with tab_stats_norm:
