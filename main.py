@@ -959,7 +959,7 @@ with tab_detections:
         dico_connecteurs=DICO_CONNECTEURS,
         dico_marqueurs=DICO_MARQUEURS,
         dico_memoires=DICO_MEMOIRES,
-        dico_consq=DICO_CONSEQS,
+        dico_consq=DICO_CONSQS,
         dico_causes=DICO_CAUSES,
         dico_tensions=DICO_TENSIONS,
     )
@@ -1334,7 +1334,7 @@ with tab_discours:
                 dico_connecteurs=DICO_CONNECTEURS,
                 dico_marqueurs=DICO_MARQUEURS,
                 dico_memoires=DICO_MEMOIRES,
-                dico_consq=DICO_CONSEQS,
+                dico_consq=DICO_CONSQS,
                 dico_causes=DICO_CAUSES,
                 dico_tensions=DICO_TENSIONS,
             )
@@ -1353,7 +1353,7 @@ with tab_discours:
                 dico_connecteurs=DICO_CONNECTEURS,
                 dico_marqueurs=DICO_MARQUEURS,
                 dico_memoires=DICO_MEMOIRES,
-                dico_consq=DICO_CONSEQS,
+                dico_consq=DICO_CONSQS,
                 dico_causes=DICO_CAUSES,
                 dico_tensions=DICO_TENSIONS,
             )
