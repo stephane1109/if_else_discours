@@ -72,11 +72,6 @@ def render_lexique_tab() -> None:
         "- **CONSEQUENCE** : en déduit l’effet ou l’issue (donc, alors, par conséquent…)."
     )
     
-    st.markdown("#### Marqueurs \"si… alors / sinon\"")
-    st.markdown(
-        "- **CONDITION** : déclenche la condition (« si… », « à condition que… »).\n"
-        "- **APODOSE / ALORS** : pointe la conséquence attendue (« alors », « donc », « dès lors… »)."
-    )
 
     st.markdown("#### Lexique grammatical spaCy (causalité)")
     st.markdown(
