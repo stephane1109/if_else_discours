@@ -5,6 +5,17 @@ import streamlit as st
 
 def render_lexique_tab() -> None:
     """Affiche le contenu de l'onglet Lexique."""
+
+    st.markdown("#### Intro...")
+    st.markdown(
+        dedent(
+            """Le script repose sur des dictionnaires au format JSON et sur un ensemble de règles regex, 
+            qui servent à repérer précisément des motifs linguistiques définis à l’avance. 
+            Les regex sont moins souples qu’une approche par NLP automatique comme SpaCy, 
+            mais elles permettent, par leur caractère très ciblé, d’atteindre un niveau de précision et de contrôle dans 
+            l’analyse. Même si je travaille actuellement sur une comparaison systématique entre les règles regex et le modèle NLP de SpaCy, 
+            l’intérêt des regex est de garantir une grande precision dans l'analyse."""
+    
     st.markdown("#### Connecteurs logique (façon python!)")
     st.markdown(
         dedent(
