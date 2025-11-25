@@ -24,6 +24,15 @@ import pandas as pd
 import streamlit as st
 from typing import List, Dict, Tuple, Any, Optional
 
+from analyses import (
+    COULEURS_BADGES,
+    COULEURS_MARQUEURS,
+    COULEURS_TENSIONS,
+    construire_regex_depuis_liste,
+    render_analyses_tab,
+    render_detection_section,
+)
+
 from import_exp import dictionnaire_to_bytes, parse_uploaded_dictionary
 
 from stats import render_stats_tab
@@ -91,69 +100,6 @@ except Exception as err:
     SPACY_STATUS.append(f"Import de spaCy impossible : {err}")
 
 # =========================
-# Palettes / libellés Python (affichage)
-# =========================
-CODE_VERS_PYTHON: Dict[str, str] = {
-    "CONDITION": "CONDITION (SI)",
-    "ALORS": "ALORS",
-    "ALTERNATIVE": "ALTERNATIVE (Sinon)",
-    "WHILE": "while",
-    # Compatibilité ascendante
-    "IF": "CONDITION (SI)",
-    "ELSE": "ALTERNATIVE (Sinon)",
-    "AND": "and",
-    "OR": "or",
-}
-
-COULEURS_BADGES: Dict[str, Dict[str, str]] = {
-    "CONDITION": {"bg": "#ffeaea", "fg": "#c00000", "bd": "#c00000"},
-    "ALORS": {"bg": "#ffeaea", "fg": "#c00000", "bd": "#c00000"},
-    "ALTERNATIVE": {"bg": "#ffeaea", "fg": "#c00000", "bd": "#c00000"},
-    "WHILE": {"bg": "#e9fbe6", "fg": "#2f7d32", "bd": "#2f7d32"},
-    # Compatibilité ascendante
-    "IF": {"bg": "#ffeaea", "fg": "#c00000", "bd": "#c00000"},
-    "ELSE": {"bg": "#ffeaea", "fg": "#c00000", "bd": "#c00000"},
-    "AND": {"bg": "#e6fffb", "fg": "#0d9488", "bd": "#0d9488"},
-    "OR": {"bg": "#fff3e6", "fg": "#b54b00", "bd": "#b54b00"},
-}
-
-LIBELLES_CODES: Dict[str, str] = {
-    "CONDITION": "CONDITION (SI)",
-    "ALORS": "ALORS",
-    "ALTERNATIVE": "ALTERNATIVE (Sinon)",
-    "WHILE": "WHILE (tant que)",
-    "AND": "AND (et)",
-    "OR": "OR (ou)",
-    "IF": "CONDITION (SI)",
-    "ELSE": "ALTERNATIVE (Sinon)",
-}
-
-COULEURS_MARQUEURS: Dict[str, Dict[str, str]] = {
-    "OBLIGATION": {"bg": "#fff7e6", "fg": "#a86600", "bd": "#a86600"},
-    "INTERDICTION": {"bg": "#ffe6e6", "fg": "#c62828", "bd": "#c62828"},
-    "PERMISSION": {"bg": "#e6fff3", "fg": "#2e7d32", "bd": "#2e7d32"},
-    "RECOMMANDATION": {"bg": "#eef2ff", "fg": "#3f51b5", "bd": "#3f51b5"},
-    "SANCTION": {"bg": "#fde7f3", "fg": "#ad1457", "bd": "#ad1457"},
-    "CADRE_OUVERTURE": {"bg": "#e6f7ff", "fg": "#0277bd", "bd": "#0277bd"},
-    "CADRE_FERMETURE": {"bg": "#ede7f6", "fg": "#6a1b9a", "bd": "#6a1b9a"},
-    "CONSEQUENCE": {"bg": "#fff0f0", "fg": "#b00020", "bd": "#b00020"},
-    "CAUSE": {"bg": "#f0fff4", "fg": "#2f855a", "bd": "#2f855a"},
-    "MEM_PERS": {"bg": "#e8f4ff", "fg": "#1565c0", "bd": "#1565c0"},
-    "MEM_COLL": {"bg": "#f1f8e9", "fg": "#33691e", "bd": "#33691e"},
-    "MEM_RAPPEL": {"bg": "#fff3e0", "fg": "#ef6c00", "bd": "#ef6c00"},
-    "MEM_RENVOI": {"bg": "#f3e5f5", "fg": "#7b1fa2", "bd": "#7b1fa2"},
-    "MEM_REPET": {"bg": "#ede7f6", "fg": "#5e35b1", "bd": "#5e35b1"},
-    "MEM_PASSE": {"bg": "#efebe9", "fg": "#6d4c41", "bd": "#6d4c41"},
-}
-
-COULEURS_TENSIONS: Dict[str, Dict[str, str]] = {
-    "DEFAULT": {"bg": "#fef3ff", "fg": "#7b1fa2", "bd": "#7b1fa2"},
-}
-FAMILLES_MARQUEURS_STANDARD = {
-    "OBLIGATION", "INTERDICTION", "PERMISSION", "RECOMMANDATION", "SANCTION", "CADRE_OUVERTURE", "CADRE_FERMETURE"
-}
-
-# =========================
 # Utilitaires texte / regex
 # =========================
 def normaliser_espace(texte: str) -> str:
@@ -171,15 +117,6 @@ def segmenter_en_phrases(texte: str) -> List[str]:
     morceaux = re.split(r"(?<=[\.\!\?\:\;])\s+", texte)
     return [m.strip() for m in morceaux if m and m.strip()]
 
-def construire_regex_depuis_liste(expressions: List[str]) -> List[Tuple[str, re.Pattern]]:
-    """Construit des motifs regex en priorisant les locutions longues (gestion d'apostrophes)."""
-    exprs_tries = sorted(expressions, key=lambda s: len(s), reverse=True)
-    motifs = []
-    for e in exprs_tries:
-        e_norm = re.escape(e.replace("’", "'"))
-        motif = re.compile(rf"(?<![A-Za-zÀ-ÖØ-öø-ÿ]){e_norm}(?![A-Za-zÀ-ÖØ-öø-ÿ])", flags=re.I)
-        motifs.append((e, motif))
-    return motifs
 
 def _est_debut_segment(texte: str, index: int) -> bool:
     """Vérifie qu’un index correspond au début d’un segment (début ou précédé d’une ponctuation forte)."""
@@ -465,502 +402,26 @@ def ajuster_negations_global(texte: str, df_marq: pd.DataFrame) -> pd.DataFrame:
 # =========================
 # Annotation HTML (texte + badges)
 # =========================
-def _esc(s: str) -> str:
-    return html.escape(s, quote=False)
-
-
-def inserer_marque_colorise(phrase: str, terme: str, couleur: str = "#c00000") -> str:
-    """Insère la 1ère occurrence de `terme` dans `phrase` sous la forme couleur rouge [terme]."""
-    if not phrase:
-        return ""
-    if not terme:
-        return _esc(phrase)
-
-    motif = re.compile(re.escape(str(terme)), flags=re.I)
-    m = motif.search(phrase)
-    if not m:
-        return _esc(phrase)
-
-    debut, fin = m.start(), m.end()
-    prefixe = _esc(phrase[:debut])
-    marque = phrase[debut:fin]
-    suffixe = _esc(phrase[fin:])
-    marque_html = (
-        f"<span style='color:{html.escape(couleur)}; font-weight:700;'>[{_esc(marque)}]</span>"
-    )
-    return prefixe + marque_html + suffixe
-
-
-def dataframe_phrase_colorisee(
-    df: pd.DataFrame,
-    colonne_terme: str,
-    colonne_phrase: str = "phrase",
-    couleur: str = "#c00000",
-    etiquette_phrase: str = "Phrase annotée",
-) -> pd.DataFrame:
-    """Ajoute une colonne HTML avec le terme mis en évidence dans la phrase."""
-    if df is None or df.empty:
-        return df
-
-    df_aff = df.copy()
-    df_aff[etiquette_phrase] = [
-        inserer_marque_colorise(
-            row.get(colonne_phrase, ""), row.get(colonne_terme, ""), couleur
-        )
-        for _, row in df_aff.iterrows()
-    ]
-    ordre_colonnes = [c for c in df_aff.columns if c not in {colonne_phrase, etiquette_phrase}]
-    return df_aff[ordre_colonnes + [etiquette_phrase]]
-
 def css_checkboxes_alignment() -> str:
     """CSS global pour harmoniser l'alignement des cases à cocher."""
     return """<style>
-div[data-testid="stCheckbox"] {
+div[data-testid=\"stCheckbox\"] {
     display: flex;
     align-items: center;
     padding-top: 0.1rem;
     padding-bottom: 0.1rem;
 }
-div[data-testid="stCheckbox"] > label {
+div[data-testid=\"stCheckbox\"] > label {
     display: flex;
     align-items: center;
     gap: 0.45rem;
     width: 100%;
 }
-div[data-testid="stCheckbox"] > label div[data-testid="stMarkdownContainer"] p {
+div[data-testid=\"stCheckbox\"] > label div[data-testid=\"stMarkdownContainer\"] p {
     margin-bottom: 0;
 }
 </style>"""
 
-
-def css_badges() -> str:
-    lignes = [
-        "<style>",
-        ".texte-annote { line-height: 1.8; font-size: 1.05rem; white-space: pre-wrap; }",
-        ".badge-code { display: inline-block; padding: 0.05rem 0.4rem; margin-left: 0.25rem; border: 1px solid #333; border-radius: 0.35rem; font-family: monospace; font-size: 0.85em; vertical-align: baseline; }",
-        ".badge-marqueur { display: inline-block; padding: 0.03rem 0.35rem; margin-left: 0.2rem; border: 1px dashed #333; border-radius: 0.35rem; font-family: monospace; font-size: 0.78em; vertical-align: baseline; }",
-        ".badge-tension { display: inline-block; padding: 0.03rem 0.35rem; margin-left: 0.2rem; border: 1px dashed #333; border-radius: 0.35rem; font-family: monospace; font-size: 0.78em; vertical-align: baseline; background-color: #fef3ff; color: #7b1fa2; border-color: #7b1fa2; }",
-        ".connecteur { font-weight: 600; color: #c00000; }",
-        ".mot-marque { font-weight: 600; text-decoration: underline; }",
-        ".mot-tension { font-weight: 600; text-decoration: underline dotted; }",
-        "</style>",
-    ]
-    for code, pal in COULEURS_BADGES.items():
-        lignes.insert(-1, f".badge-code.code-{code} {{ background-color: {pal['bg']}; color: {pal['fg']}; border-color: {pal['bd']}; }}")
-    for cat, pal in COULEURS_MARQUEURS.items():
-        lignes.insert(-1, f".badge-marqueur.marq-{_esc(cat)} {{ background-color: {pal['bg']}; color: {pal['fg']}; border-color: {pal['bd']}; }}")
-    for cat, pal in COULEURS_TENSIONS.items():
-        lignes.insert(-1, f".badge-tension.tension-{_esc(cat)} {{ background-color: {pal['bg']}; color: {pal['fg']}; border-color: {pal['bd']}; }}")
-    return "\n".join(lignes)
-
-def occurrences_mixte(texte: str,
-                      dico_conn: Dict[str, str],
-                      dico_marq: Dict[str, str],
-                      dico_memoires: Dict[str, str],
-                      dico_consq: Dict[str, str],
-                      dico_causes: Dict[str, str],
-                      dico_tensions: Dict[str, str]) -> List[Dict[str, Any]]:
-    """Fusionne toutes les occurrences, élimine les chevauchements (priorité au plus long)."""
-    occs: List[Dict[str, Any]] = []
-    for typ, dico in [
-        ("connecteur", dico_conn),
-        ("marqueur", dico_marq),
-        ("memoire", dico_memoires),
-        ("consequence", dico_consq),
-        ("cause", dico_causes),
-        ("tension", dico_tensions),
-    ]:
-        if not dico:
-            continue
-        motifs = construire_regex_depuis_liste(list(dico.keys()))
-        for cle, motif in motifs:
-            for m in motif.finditer(texte):
-                occs.append({
-                    "debut": m.start(), "fin": m.end(), "original": texte[m.start():m.end()],
-                    "type": typ, "cle": cle, "etiquette": dico[cle], "longueur": m.end()-m.start(),
-                })
-    occs.sort(key=lambda x: (x["debut"], -x["longueur"]))
-    res = []; borne = -1
-    for m in occs:
-        if m["debut"] >= borne:
-            res.append(m); borne = m["fin"]
-    return res
-
-def libelle_python(code: str) -> str:
-    return CODE_VERS_PYTHON.get(str(code).upper(), str(code).upper())
-
-def html_annote(texte: str,
-                dico_conn: Dict[str, str],
-                dico_marq: Dict[str, str],
-                dico_memoires: Dict[str, str],
-                dico_consq: Dict[str, str],
-                dico_causes: Dict[str, str],
-                dico_tensions: Dict[str, str],
-                show_codes: Dict[str, bool],
-                show_consequences: bool,
-                show_causes: bool,
-                show_tensions: bool,
-                show_marqueurs_categories: Dict[str, bool] = None,
-                show_memoires_categories: Dict[str, bool] = None,
-                show_tensions_categories: Dict[str, bool] = None) -> str:
-    """Produit le HTML annoté selon les cases cochées."""
-    if not texte:
-        return "<div class='texte-annote'>(Texte vide)</div>"
-    if show_marqueurs_categories is not None:
-        show_marqueurs_categories = {
-            str(cat).upper(): bool(val)
-            for cat, val in show_marqueurs_categories.items()
-        }
-    if show_memoires_categories is not None:
-        show_memoires_categories = {
-            str(cat).upper(): bool(val)
-            for cat, val in show_memoires_categories.items()
-        }
-    if show_tensions_categories is not None:
-        show_tensions_categories = {
-            str(cat).upper(): bool(val)
-            for cat, val in show_tensions_categories.items()
-        }
-
-    t = texte
-    occ = occurrences_mixte(t, dico_conn, dico_marq, dico_memoires, dico_consq, dico_causes, dico_tensions)
-    morceaux: List[str] = []; curseur = 0
-    for m in occ:
-        # Filtres d’affichage
-        if m["type"] == "connecteur":
-            code = str(m["etiquette"]).upper()
-            if not show_codes.get(code, True):
-                continue
-        elif m["type"] == "marqueur":
-            cat = str(m["etiquette"]).upper()
-            if show_marqueurs_categories is not None and not show_marqueurs_categories.get(cat, True):
-                continue
-        elif m["type"] == "memoire":
-            cat = str(m["etiquette"]).upper()
-            if show_memoires_categories is not None and not show_memoires_categories.get(cat, True):
-                continue
-        elif m["type"] == "consequence":
-            if not show_consequences:
-                continue
-        elif m["type"] == "cause":
-            if not show_causes:
-                continue
-        elif m["type"] == "tension":
-            if not show_tensions:
-                continue
-            cat = str(m["etiquette"]).upper()
-            if show_tensions_categories is not None and not show_tensions_categories.get(cat, True):
-                continue
-
-        if m["debut"] > curseur:
-            morceaux.append(_esc(t[curseur:m["debut"]]))
-
-        mot_original = _esc(t[m["debut"]:m["fin"]])
-        if m["type"] == "connecteur":
-            code = str(m["etiquette"]).upper()
-            badge = f"<span class='badge-code code-{_esc(code)}'>{_esc(libelle_python(code))}</span>"
-            rendu = f"<span class='connecteur'>{mot_original}</span>{badge}"
-        elif m["type"] == "tension":
-            cat_disp = str(m["etiquette"]).upper()
-            css_suffix = cat_disp if cat_disp in COULEURS_TENSIONS else "DEFAULT"
-            badge = f"<span class='badge-tension tension-{_esc(css_suffix)}'>{_esc(cat_disp)}</span>"
-            rendu = f"<span class='mot-tension'>{mot_original}</span>{badge}"
-        else:
-            cat_disp = str(m["etiquette"]).upper()
-            badge = f"<span class='badge-marqueur marq-{_esc(cat_disp)}'>{_esc(cat_disp)}</span>"
-            rendu = f"<span class='mot-marque'>{mot_original}</span>{badge}"
-
-        morceaux.append(rendu); curseur = m["fin"]
-
-    if curseur < len(t):
-        morceaux.append(_esc(t[curseur:]))
-
-    if not morceaux:
-        return "<div class='texte-annote'>(Aucune annotation selon les cases sélectionnées)</div>"
-    return "<div class='texte-annote'>" + "".join(morceaux) + "</div>"
-
-
-def toggle_checkboxes(prefix: str, options_keys: List[str], value: bool) -> None:
-    """Force un ensemble de cases à cocher Streamlit à True/False via st.session_state."""
-    for opt in options_keys:
-        key = f"{prefix}{opt}"
-        st.session_state[key] = value
-
-def html_autonome(fragment_html: str) -> str:
-    return f"<!DOCTYPE html><html lang='fr'><head><meta charset='utf-8'/><title>Texte annoté</title>{css_badges()}</head><body>{fragment_html}</body></html>"
-
-
-def _couleur_depuis_palette(cle: str, palette: Dict[str, Dict[str, str]], par_defaut: str = "#c00000") -> str:
-    """Retourne la couleur de premier plan pour une catégorie donnée."""
-    return palette.get(str(cle).upper(), {}).get("fg", par_defaut)
-
-
-def _tableau_couleurs_depuis_dico(
-    titre: str,
-    dico: Dict[str, Any],
-    palette: Dict[str, Dict[str, str]],
-    etiquette_label: str = "Étiquette",
-) -> None:
-    """Affiche un tableau HTML avec un exemple coloré [entrée] pour chaque élément du dictionnaire."""
-    st.markdown(f"**{titre}**")
-    if not dico:
-        st.info("Aucune entrée disponible.")
-        return
-
-    lignes = []
-    for expression, etiquette in sorted(dico.items(), key=lambda x: str(x[0]).lower()):
-        couleur = _couleur_depuis_palette(etiquette, palette)
-        exemple = f"<span style='color:{html.escape(couleur)}; font-weight:700;'>[{html.escape(str(expression))}]</span>"
-        lignes.append(
-            {
-                "Entrée": expression,
-                etiquette_label: str(etiquette).upper(),
-                "Exemple coloré": exemple,
-            }
-        )
-
-    df = pd.DataFrame(lignes)
-    st.markdown(df.to_html(index=False, escape=False), unsafe_allow_html=True)
-
-
-def render_detection_section(
-    texte_source: str,
-    detections: Dict[str, pd.DataFrame],
-    key_prefix: str = "",
-    use_regex_cc: bool = True,
-    heading_color: Optional[str] = None,
-):
-    """Affiche les résultats de détection pour un texte (onglet Analyses)."""
-
-    df_conn = detections.get("df_conn", pd.DataFrame())
-    df_marq = detections.get("df_marq", pd.DataFrame())
-    df_memoires = detections.get("df_memoires", pd.DataFrame())
-    df_consq_lex = detections.get("df_consq_lex", pd.DataFrame())
-    df_causes_lex = detections.get("df_causes_lex", pd.DataFrame())
-    df_tensions = detections.get("df_tensions", pd.DataFrame())
-
-    def _subheader(titre: str) -> None:
-        if heading_color:
-            st.markdown(
-                f"<span style=\"color:{heading_color}; font-size:1.25rem; font-weight:700;\">{html.escape(titre)}</span>",
-                unsafe_allow_html=True,
-            )
-        else:
-            st.subheader(titre)
-
-    _subheader("Connecteurs logiques détectés")
-    if df_conn.empty:
-        st.info("Aucun Connecteur logique détecté ou aucun texte fourni.")
-    else:
-        st.dataframe(df_conn)
-        st.download_button(
-            "Exporter Connecteurs logiques (CSV)",
-            data=df_conn.to_csv(index=False).encode("utf-8"),
-            file_name="occurrences_connecteurs_logiques.csv",
-            mime="text/csv",
-            key=f"{key_prefix}dl_occ_conn_csv",
-        )
-
-    _subheader("Marqueurs détectés")
-    if df_marq.empty:
-        st.info("Aucun marqueur détecté.")
-    else:
-        st.dataframe(df_marq)
-        st.download_button(
-            "Exporter marqueurs (CSV)",
-            data=df_marq.to_csv(index=False).encode("utf-8"),
-            file_name="occurrences_marqueurs.csv",
-            mime="text/csv",
-            key=f"{key_prefix}dl_occ_marq_csv",
-        )
-
-    _subheader("Tensions sémantiques détectées")
-    if not DICO_TENSIONS:
-        st.info("Aucun dictionnaire de tensions sémantiques chargé.")
-    elif df_tensions.empty:
-        st.info("Aucune tension sémantique détectée dans le texte.")
-    else:
-        st.dataframe(df_tensions)
-        st.download_button(
-            "Exporter tensions sémantiques (CSV)",
-            data=df_tensions.to_csv(index=False).encode("utf-8"),
-            file_name="tensions_semantiques.csv",
-            mime="text/csv",
-            key=f"{key_prefix}dl_occ_tensions_csv",
-        )
-
-    _subheader("Marqueurs mémoire détectés")
-    if df_memoires.empty:
-        st.info("Aucun marqueur mémoire détecté.")
-    else:
-        st.dataframe(df_memoires)
-        st.download_button(
-            "Exporter marqueurs mémoire (CSV)",
-            data=df_memoires.to_csv(index=False).encode("utf-8"),
-            file_name="occurrences_memoires.csv",
-            mime="text/csv",
-            key=f"{key_prefix}dl_occ_memoires_csv",
-        )
-
-    colX, colY = st.columns(2)
-    with colX:
-        _subheader("Déclencheurs de conséquence (Regex)")
-        if not use_regex_cc:
-            st.info("Méthode Regex désactivée (voir barre latérale).")
-        elif df_consq_lex.empty:
-            st.info("Aucun déclencheur de conséquence détecté par Regex.")
-        else:
-            st.dataframe(df_consq_lex)
-            st.download_button(
-                "Exporter conséquences (CSV)",
-                data=df_consq_lex.to_csv(index=False).encode("utf-8"),
-                file_name="occurrences_consequences.csv",
-                mime="text/csv",
-                key=f"{key_prefix}dl_occ_consq_csv",
-            )
-    with colY:
-        _subheader("Déclencheurs de cause (Regex)")
-        if not use_regex_cc:
-            st.info("Méthode Regex désactivée (voir barre latérale).")
-        elif df_causes_lex.empty:
-            st.info("Aucun déclencheur de cause détecté par Regex.")
-        else:
-            st.dataframe(df_causes_lex)
-            st.download_button(
-                "Exporter causes (CSV)",
-                data=df_causes_lex.to_csv(index=False).encode("utf-8"),
-                file_name="occurrences_causes.csv",
-                mime="text/csv",
-                key=f"{key_prefix}dl_occ_causes_csv",
-            )
-    _subheader("Texte annoté")
-
-    codes_disponibles = sorted({str(v).upper() for v in DICO_CONNECTEURS.values()})
-    show_codes: Dict[str, bool] = {}
-    if codes_disponibles:
-        st.markdown("**Familles de Connecteurs logiques**")
-        col_all, col_none = st.columns(2)
-        activer_conn = col_all.button(
-            "Tout cocher (Connecteurs logiques)", key=f"{key_prefix}btn_conn_all"
-        )
-        desactiver_conn = col_none.button(
-            "Tout décocher (Connecteurs logiques)", key=f"{key_prefix}btn_conn_none"
-        )
-        if activer_conn or desactiver_conn:
-            toggle_checkboxes(
-                f"{key_prefix}chk_code_",
-                [code.lower() for code in codes_disponibles],
-                activer_conn,
-            )
-        for code in codes_disponibles:
-            label = LIBELLES_CODES.get(code, code)
-            show_codes[code] = st.checkbox(
-                label,
-                value=st.session_state.get(f"{key_prefix}chk_code_{code.lower()}", True),
-                key=f"{key_prefix}chk_code_{code.lower()}",
-            )
-
-    categories_normatives = sorted({str(v).upper() for v in DICO_MARQUEURS.values()})
-    show_marqueurs_categories: Dict[str, bool] = {}
-    if categories_normatives:
-        st.markdown("**Marqueurs normatifs**")
-        col_all, col_none = st.columns(2)
-        activer_marqueurs = col_all.button(
-            "Tout cocher (marqueurs)", key=f"{key_prefix}btn_marqueur_all"
-        )
-        desactiver_marqueurs = col_none.button(
-            "Tout décocher (marqueurs)", key=f"{key_prefix}btn_marqueur_none"
-        )
-        if activer_marqueurs or desactiver_marqueurs:
-            toggle_checkboxes(
-                f"{key_prefix}chk_marqueur_",
-                [cat.lower() for cat in categories_normatives],
-                activer_marqueurs,
-            )
-        for cat in categories_normatives:
-            label = cat.replace("_", " ")
-            show_marqueurs_categories[cat] = st.checkbox(
-                label,
-                value=st.session_state.get(f"{key_prefix}chk_marqueur_{cat.lower()}", True),
-                key=f"{key_prefix}chk_marqueur_{cat.lower()}",
-            )
-    else:
-        show_marqueurs_categories = None
-
-    categories_memoires = sorted({str(v).upper() for v in DICO_MEMOIRES.values()})
-    show_memoires_categories: Dict[str, bool] = {}
-    if categories_memoires:
-        st.markdown("**Marqueurs mémoire**")
-        col_all, col_none = st.columns(2)
-        activer_memoires = col_all.button(
-            "Tout cocher (mémoire)", key=f"{key_prefix}btn_memoire_all"
-        )
-        desactiver_memoires = col_none.button(
-            "Tout décocher (mémoire)", key=f"{key_prefix}btn_memoire_none"
-        )
-        if activer_memoires or desactiver_memoires:
-            toggle_checkboxes(
-                f"{key_prefix}chk_memoire_",
-                [cat.lower() for cat in categories_memoires],
-                activer_memoires,
-            )
-        for cat in categories_memoires:
-            label = cat.replace("_", " ")
-            show_memoires_categories[cat] = st.checkbox(
-                label,
-                value=st.session_state.get(f"{key_prefix}chk_memoire_{cat.lower()}", True),
-                key=f"{key_prefix}chk_memoire_{cat.lower()}",
-            )
-    else:
-        show_memoires_categories = None
-
-    categories_tensions = sorted({str(v).upper() for v in DICO_TENSIONS.values()})
-    show_tensions_categories: Optional[Dict[str, bool]] = None
-    if categories_tensions:
-        st.markdown("**Tensions sémantiques**")
-        show_tensions = st.checkbox(
-            "Afficher les tensions sémantiques",
-            value=True,
-            key=f"{key_prefix}chk_tensions_global",
-        )
-    else:
-        show_tensions = False
-
-    st.markdown("**Marqueurs de causalité**")
-    show_consequences = st.checkbox(
-        "CONSEQUENCE", value=True, key=f"{key_prefix}chk_consequence"
-    )
-    show_causes = st.checkbox("CAUSE", value=True, key=f"{key_prefix}chk_cause")
-
-    st.markdown(css_badges(), unsafe_allow_html=True)
-    if not texte_source.strip():
-        st.info("Aucun texte fourni.")
-        frag = "<div class='texte-annote'>(Texte vide)</div>"
-    else:
-        frag = html_annote(
-            texte_source,
-            DICO_CONNECTEURS,
-            DICO_MARQUEURS,
-            DICO_MEMOIRES,
-            DICO_CONSQS if show_consequences else {},
-            DICO_CAUSES if show_causes else {},
-            DICO_TENSIONS if show_tensions else {},
-            show_codes=show_codes,
-            show_marqueurs_categories=show_marqueurs_categories,
-            show_memoires_categories=show_memoires_categories,
-            show_tensions_categories=show_tensions_categories,
-            show_consequences=show_consequences,
-            show_causes=show_causes,
-            show_tensions=show_tensions,
-        )
-        st.markdown(frag, unsafe_allow_html=True)
-        st.download_button(
-            "Exporter le texte annoté (HTML)",
-            data=html_autonome(frag).encode("utf-8"),
-            file_name="texte_annote.html",
-            mime="text/html",
-            key=f"{key_prefix}dl_annote_html",
-        )
 
 # =========================
 # Extraction graphes WHILE / IF (heuristiques)
@@ -1490,12 +951,17 @@ libelle_discours_2 = (
 
 # Onglet Analyses (listes + texte annoté)
 with tab_detections:
-    st.markdown(f"### {libelle_discours_1}")
-    render_detection_section(
+    render_analyses_tab(
+        libelle_discours_1,
         texte_source,
         detections_1,
-        key_prefix="disc1_",
         use_regex_cc=use_regex_cc,
+        dico_connecteurs=DICO_CONNECTEURS,
+        dico_marqueurs=DICO_MARQUEURS,
+        dico_memoires=DICO_MEMOIRES,
+        dico_consq=DICO_CONSEQS,
+        dico_causes=DICO_CAUSES,
+        dico_tensions=DICO_TENSIONS,
     )
 
 # Onglet Dictionnaires (JSON)
@@ -1865,6 +1331,12 @@ with tab_discours:
                 key_prefix="disc1_compare_",
                 use_regex_cc=use_regex_cc,
                 heading_color=couleur_discours_1,
+                dico_connecteurs=DICO_CONNECTEURS,
+                dico_marqueurs=DICO_MARQUEURS,
+                dico_memoires=DICO_MEMOIRES,
+                dico_consq=DICO_CONSEQS,
+                dico_causes=DICO_CAUSES,
+                dico_tensions=DICO_TENSIONS,
             )
 
         with col_b:
@@ -1878,4 +1350,10 @@ with tab_discours:
                 key_prefix="disc2_compare_",
                 use_regex_cc=use_regex_cc,
                 heading_color=couleur_discours_2,
+                dico_connecteurs=DICO_CONNECTEURS,
+                dico_marqueurs=DICO_MARQUEURS,
+                dico_memoires=DICO_MEMOIRES,
+                dico_consq=DICO_CONSEQS,
+                dico_causes=DICO_CAUSES,
+                dico_tensions=DICO_TENSIONS,
             )
