@@ -949,7 +949,6 @@ libelle_discours_2 = (
 (
     tab_detections,
     tab_conditions,
-    tab_comparatif,
     tab_stats,
     tab_stats_norm,
     tab_discours,
@@ -957,11 +956,11 @@ libelle_discours_2 = (
     tab_dicos,
     tab_mapping,
     tab_lexique,
+    tab_comparatif,
 ) = st.tabs(
     [
         "Analyses",
         "conditions logiques : si/alors",
-        "Comparatif Regex / spaCy",
         "Stats",
         "Stats norm",
         "2 discours",
@@ -969,6 +968,7 @@ libelle_discours_2 = (
         "Dictionnaires (JSON)",
         "Expressions mappées",
         "Lexique",
+        "Comparatif règles Regex vs Spacy",
     ]
 )
 
@@ -1186,7 +1186,7 @@ with tab_conditions:
                     key="dl_conditions_spacy_csv",
                 )
 
-# Onglet 4 : Comparatif Regex / spaCy
+# Onglet Comparatif Regex / spaCy
 with tab_comparatif:
     st.subheader("Comparatif des détections Causes/Conséquences : Regex vs spaCy")
 
