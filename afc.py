@@ -349,7 +349,8 @@ def render_afc_tab(
         return
 
     inertie_totale = float(sum(eigvals)) if eigvals else 0.0
-    if inertie_totale <= 0 or math.isclose(inertie_totale, 0.0):
+    inertie_nulle = inertie_totale <= 0 or math.isclose(inertie_totale, 0.0, abs_tol=1e-12)
+    if inertie_nulle:
         st.warning(
             "Inertie totale nulle : impossible de calculer les contributions des dimensions."
         )
