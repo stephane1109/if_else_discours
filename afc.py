@@ -328,8 +328,12 @@ def render_afc_tab(
     chart = tracer_nuage_factoriel(row_df, col_df, df_selection, coords_marqueurs, axe_x, axe_y, nb_mots)
 
     inertie = ca.eigenvalues_.sum()
-    inertie_dim1 = ca.explained_inertia_[axe_x - 1] * 100 if len(ca.explained_inertia_) >= axe_x else 0.0
-    inertie_dim2 = ca.explained_inertia_[axe_y - 1] * 100 if len(ca.explained_inertia_) >= axe_y else 0.0
+    explained_inertia = getattr(ca, "explained_inertia_", [])
+    if (explained_inertia is None or len(explained_inertia) == 0) and inertie:
+        explained_inertia = ca.eigenvalues_ / inertie  # Compatibilité pour les versions de prince sans explained_inertia_
+
+    inertie_dim1 = explained_inertia[axe_x - 1] * 100 if len(explained_inertia) >= axe_x else 0.0
+    inertie_dim2 = explained_inertia[axe_y - 1] * 100 if len(explained_inertia) >= axe_y else 0.0
 
     st.markdown(
         f"**Inertie totale** : {inertie:.3f} · Dim {axe_x} : {inertie_dim1:.1f}% · Dim {axe_y} : {inertie_dim2:.1f}%"
