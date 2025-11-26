@@ -44,6 +44,12 @@ from conditions_spacy import analyser_conditions_spacy
 from argToulmin import render_toulmin_tab
 from lexique import render_lexique_tab
 from storytelling.pynarrative import generer_storytelling_mermaid
+from storytelling.actanciel import (
+    analyser_actants_texte,
+    charger_dictionnaire_actanciel,
+    construire_tableau_actanciel,
+    synthese_roles_actanciels,
+)
 from streamlit_utils import dataframe_safe
 from text_utils import normaliser_espace, segmenter_en_phrases
 from annotations import render_annotation_tab
@@ -805,6 +811,7 @@ try:
         DICO_MEMOIRES,
         DICO_TENSIONS,
     ) = charger_dicos_conditions()
+    DICO_ACTANCIEL = charger_dictionnaire_actanciel(DICTIONNAIRES_DIR / "actanciel.py")
 except Exception as e:
     st.error("Impossible de charger les dictionnaires JSON depuis le dossier 'dictionnaires/'.")
     st.code(str(e))
@@ -1332,6 +1339,43 @@ with tab_storytelling:
                         st.info(
                             "Aucun marqueur narratif dominant n'a été trouvé : le diagramme reste minimal."
                         )
+
+    st.markdown("### Schéma actanciel")
+    st.markdown(
+        "Le schéma actanciel met en relation les rôles (sujet, objet, adjuvant…) dans un récit politique."\
+        "\nIl permet d'identifier qui agit, pour qui et contre quoi au fil du discours."
+    )
+
+    textes_actanciels: Dict[str, str] = {}
+    if texte_source.strip():
+        textes_actanciels[libelle_discours_1] = texte_source
+    if texte_source_2.strip():
+        textes_actanciels[libelle_discours_2] = texte_source_2
+
+    if not textes_actanciels:
+        st.info("Aucun discours fourni pour réaliser l'analyse actancielle.")
+    else:
+        choix_actanciel = st.selectbox(
+            "Choisissez le discours à analyser selon les actants",
+            options=list(textes_actanciels.keys()),
+            key="choix_actanciel",
+        )
+
+        if st.button("Analyser les actants", key="btn_actanciel"):
+            texte_cible = textes_actanciels.get(choix_actanciel, "")
+            df_actants = analyser_actants_texte(texte_cible, DICO_ACTANCIEL)
+            tableau = construire_tableau_actanciel(df_actants)
+            if tableau.empty:
+                st.warning("Aucun marqueur actanciel détecté dans ce discours.")
+            else:
+                st.success("Analyse actancielle terminée.")
+                st.dataframe(tableau, use_container_width=True)
+                synthese = synthese_roles_actanciels(df_actants)
+                if not synthese.empty:
+                    st.bar_chart(
+                        data=synthese.set_index("role_actanciel"),
+                        use_container_width=True,
+                    )
 
 with tab_stats_norm:
     render_stats_norm_tab(
