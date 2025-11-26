@@ -1345,6 +1345,10 @@ with tab_storytelling:
         "Le schéma actanciel met en relation les rôles (sujet, objet, adjuvant…) dans un récit politique."\
         "\nIl permet d'identifier qui agit, pour qui et contre quoi au fil du discours."
     )
+    st.markdown(
+        "Le schéma actanciel, dans une perspective d’analyse narrative, est un modèle qui décrit la structure d’un récit non pas à partir des personnages concrets, mais à partir des rôles qu’ils jouent dans l’action. "
+        "Il distingue notamment un sujet (celui qui entreprend une quête), un objet (ce qui est recherché ou à atteindre), un destinateur (ce qui pousse à agir: une instance supérieure, une valeur, une institution, une crise...), un destinataire (ceux pour qui l’action est menée ou qui en reçoivent les effets), des adjuvants (ce qui aide le sujet: alliés, institutions, dispositifs, circonstances favorables), et des opposants (ce qui fait obstacle: adversaires, contraintes, résistances, crises)."
+    )
 
     textes_actanciels: Dict[str, str] = {}
     if texte_source.strip():
