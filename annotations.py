@@ -128,7 +128,7 @@ def render_annotation_tab(texte_source: str) -> None:
     if texte.strip():
         st.markdown(
             "<div style='white-space:pre-wrap; border:1px solid #e0e0e0; padding:0.75rem; "
-            "border-radius:0.5rem; background:#fafafa;'>" + html.escape(texte) + "</div>",
+            "border-radius:0.5rem; background:#fafafa; color:#111;'>" + html.escape(texte) + "</div>",
             unsafe_allow_html=True,
         )
     else:
@@ -158,14 +158,6 @@ def render_annotation_tab(texte_source: str) -> None:
     _sync_label_checkboxes(st.session_state["annotation_labels"])
 
     if texte.strip():
-        start, end = st.slider(
-            "Sélection du passage",
-            min_value=0,
-            max_value=len(texte),
-            value=(0, min(len(texte), 20)),
-            step=1,
-        )
-
         labels_actuels = st.session_state["annotation_labels"]
         selection_checkbox = []
         st.markdown("**Choisissez le label à appliquer :**")
@@ -175,27 +167,49 @@ def render_annotation_tab(texte_source: str) -> None:
 
         labels_selectionnes = [lab for lab, checked in selection_checkbox if checked]
 
-        selection = texte[start:end]
-        st.markdown(
-            f"**Aperçu du surlignage** : {selection if selection else '(aucune sélection)'}"
+        selection = st.text_area(
+            "Passage à annoter",
+            value="",
+            height=120,
+            placeholder="Copiez/collez ici le passage exact à annoter (il doit exister dans le texte importé)",
+            key="annotation_selection",
         )
+
+        selection_stripped = selection.strip()
+        plain_text = st.session_state["annotation_plain_text"]
+        position = plain_text.find(selection_stripped) if selection_stripped else -1
+
+        if selection_stripped and position == -1:
+            st.warning(
+                "Passage non trouvé dans le texte importé. Assurez-vous de copier/coller le segment exact."
+            )
+        elif selection_stripped:
+            st.markdown(f"**Aperçu du surlignage** : {selection_stripped}")
+            st.caption("Seule la première occurrence du passage sera annotée.")
+        else:
+            st.markdown("**Aperçu du surlignage** : (aucune sélection)")
 
         if st.button("Ajouter l'annotation", key="ajouter_annotation"):
             if len(labels_selectionnes) == 0:
                 st.error("Sélectionnez d'abord un label via les cases à cocher.")
             elif len(labels_selectionnes) > 1:
                 st.error("Ne cochez qu'un seul label à la fois pour l'annotation.")
-            elif end <= start:
-                st.error("La fin doit être supérieure au début de la sélection.")
-            elif not selection.strip():
-                st.error("Sélectionnez un passage non vide.")
+            elif not selection_stripped:
+                st.error(
+                    "Sélectionnez un passage non vide en le copiant/collant depuis le texte importé."
+                )
+            elif position == -1:
+                st.error(
+                    "Passage introuvable dans le texte importé : vérifiez la casse, les espaces et la ponctuation."
+                )
             else:
+                end = position + len(selection_stripped)
                 st.session_state["annotations"].append(
                     Annotation(
                         label=labels_selectionnes[0],
-                        start=start,
+                        start=position,
                         end=end,
-                        text=selection,
+                        text=plain_text[position:end],
                     )
                 )
                 st.success(
