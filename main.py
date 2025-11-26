@@ -43,7 +43,8 @@ from stats_norm import render_stats_norm_tab
 from conditions_spacy import analyser_conditions_spacy
 from argToulmin import render_toulmin_tab
 from lexique import render_lexique_tab
-from afc import render_afc_tab
+from afc import construire_df_phrases, render_afc_tab
+from storytelling.pynarrative import generer_storytelling_mermaid
 from streamlit_utils import dataframe_safe
 from text_utils import normaliser_espace, segmenter_en_phrases
 from annotations import render_annotation_tab
@@ -945,6 +946,7 @@ libelle_discours_2 = (
     tab_lexique,
     tab_comparatif,
     tab_annot,
+    tab_storytelling,
 ) = st.tabs(
     [
         "Analyses",
@@ -959,6 +961,7 @@ libelle_discours_2 = (
         "Lexique",
         "Comparatif règles Regex vs Spacy",
         "Annot",
+        "Storytelling du discours",
     ]
 )
 
@@ -1271,6 +1274,57 @@ with tab_afc:
         libelle_discours_1,
         libelle_discours_2,
     )
+
+with tab_storytelling:
+    st.subheader("Storytelling du discours")
+    st.caption(
+        "Construction d'une narration par scènes à partir des phrases annotées, "
+        "avec export du flowchart Mermaid prêt à être visualisé."
+    )
+
+    # Préparation des phrases annotées pour chaque discours
+    df_phrases_1 = construire_df_phrases(texte_source, detections_1, libelle_discours_1)
+    df_phrases_2 = construire_df_phrases(texte_source_2, detections_2, libelle_discours_2)
+
+    options_df = {}
+    if not df_phrases_1.empty:
+        options_df[libelle_discours_1] = df_phrases_1
+    if not df_phrases_2.empty:
+        options_df[libelle_discours_2] = df_phrases_2
+
+    if not options_df:
+        st.info("Aucune phrase disponible pour construire le storytelling narratif.")
+    else:
+        choix_discours = st.selectbox(
+            "Choisissez le discours à transformer en narration",
+            options=list(options_df.keys()),
+        )
+
+        if st.button("Générer le storytelling narratif", key="btn_storytelling"):
+            df_cible = options_df.get(choix_discours, pd.DataFrame())
+            if df_cible.empty:
+                st.warning("Aucune phrase détectée pour ce discours.")
+            else:
+                try:
+                    code_mermaid = generer_storytelling_mermaid(df_cible)
+                except Exception as err:
+                    st.error(f"Impossible de générer le storytelling : {err}")
+                else:
+                    st.success(
+                        "Storytelling généré. Copiez le code ou téléchargez le fichier Mermaid."
+                    )
+                    st.code(code_mermaid, language="markdown")
+                    st.download_button(
+                        "Télécharger le diagramme Mermaid",
+                        data=code_mermaid,
+                        file_name="storytelling_mermaid.mmd",
+                        mime="text/plain",
+                        key="dl_storytelling_mermaid",
+                    )
+                    if "Aucune scène narrative détectée" in code_mermaid:
+                        st.info(
+                            "Aucun marqueur narratif dominant n'a été trouvé : le diagramme reste minimal."
+                        )
 
 with tab_stats_norm:
     render_stats_norm_tab(
