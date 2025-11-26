@@ -43,7 +43,6 @@ from stats_norm import render_stats_norm_tab
 from conditions_spacy import analyser_conditions_spacy
 from argToulmin import render_toulmin_tab
 from lexique import render_lexique_tab
-from afc import construire_df_phrases, render_afc_tab
 from storytelling.pynarrative import generer_storytelling_mermaid
 from streamlit_utils import dataframe_safe
 from text_utils import normaliser_espace, segmenter_en_phrases
@@ -141,6 +140,22 @@ def _trouver_occurrences_motifs(texte: str, motifs: List[Tuple[str, re.Pattern]]
             spans.append(span)
     occurrences.sort(key=lambda occ: occ["start"])
     return occurrences
+
+
+def construire_df_phrases_storytelling(
+    texte: str, detections: Dict[str, pd.DataFrame], libelle_discours: str
+) -> pd.DataFrame:
+    """Construit un DataFrame par phrase pour le module de storytelling."""
+
+    texte_norm = normaliser_espace(texte)
+    phrases = segmenter_en_phrases(texte_norm) if texte_norm else []
+    return pd.DataFrame(
+        {
+            "id_phrase": list(range(1, len(phrases) + 1)),
+            "texte_phrase": phrases,
+            "discours": libelle_discours,
+        }
+    )
 
 
 def preparer_detections(texte_source: str, use_regex_cc: bool) -> Dict[str, pd.DataFrame]:
@@ -936,7 +951,6 @@ libelle_discours_2 = (
 (
     tab_detections,
     tab_conditions,
-    tab_afc,
     tab_stats,
     tab_stats_norm,
     tab_discours,
@@ -951,7 +965,6 @@ libelle_discours_2 = (
     [
         "Analyses",
         "conditions logiques : si/alors",
-        "AFC",
         "Stats",
         "Stats norm",
         "2 discours",
@@ -1265,16 +1278,6 @@ with tab_stats:
         couleur_discours_2=couleur_discours_2,
     )
 
-with tab_afc:
-    render_afc_tab(
-        texte_source,
-        texte_source_2,
-        detections_1,
-        detections_2,
-        libelle_discours_1,
-        libelle_discours_2,
-    )
-
 with tab_storytelling:
     st.subheader("Storytelling du discours")
     st.caption(
@@ -1283,8 +1286,12 @@ with tab_storytelling:
     )
 
     # Préparation des phrases annotées pour chaque discours
-    df_phrases_1 = construire_df_phrases(texte_source, detections_1, libelle_discours_1)
-    df_phrases_2 = construire_df_phrases(texte_source_2, detections_2, libelle_discours_2)
+    df_phrases_1 = construire_df_phrases_storytelling(
+        texte_source, detections_1, libelle_discours_1
+    )
+    df_phrases_2 = construire_df_phrases_storytelling(
+        texte_source_2, detections_2, libelle_discours_2
+    )
 
     options_df = {}
     if not df_phrases_1.empty:
