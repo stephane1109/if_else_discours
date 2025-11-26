@@ -1,189 +1,254 @@
 # -*- coding: utf-8 -*-
-"""Onglet AFC (analyse factorielle des correspondances).
+"""Onglet AFC pour l'analyse de discours.
 
-Ce module construit une table de contingence à partir des détections
-réalisées sur les discours et propose une AFC simplifiée (sans
-dépendance externe). Les lignes correspondent aux discours complets ou
-aux phrases, et les colonnes regroupent différents types de marqueurs
-ou connecteurs (normes, causes/conséquences, mémoire, tensions
-semantiques, etc.).
+Ce module propose une préparation des données par phrase, la construction
+d'une matrice "phrases × mots" et l'application d'une analyse factorielle
+des correspondances (AFC) avec des variables illustratives correspondant
+aux marqueurs et connecteurs détectés.
 """
 
 from __future__ import annotations
 
-from collections import Counter
-from dataclasses import dataclass
-from typing import Dict, List, Optional, Sequence, Tuple
+from typing import Dict, Sequence, Tuple
 
 import altair as alt
-import math
-import numpy as np
 import pandas as pd
 import streamlit as st
+import unicodedata
+
+import prince
+from sklearn.feature_extraction.text import CountVectorizer
 
 from text_utils import normaliser_espace, segmenter_en_phrases
 
 
-@dataclass
-class Segment:
-    """Représente un segment de discours (discours complet ou phrase)."""
+# ===============================================================
+# Fonctions utilitaires (préparation des données)
+# ===============================================================
+def _normaliser_nom_variable(prefixe: str, categorie: str) -> str:
+    """Normalise un libellé de catégorie pour en faire un nom de colonne.
 
-    label: str
-    texte: str
-    id_phrase: Optional[int] = None
+    - Passage en minuscules
+    - Suppression des accents
+    - Remplacement des caractères non alphanumériques par des underscores
+    """
 
-
-def _construire_segments(texte: str, label_discours: str, mode: str) -> List[Segment]:
-    texte_norm = normaliser_espace(texte)
-    if not texte_norm:
-        return []
-
-    if mode == "Discours complet":
-        return [Segment(label=label_discours, texte=texte_norm, id_phrase=None)]
-
-    segments = []
-    for i, phrase in enumerate(segmenter_en_phrases(texte_norm), start=1):
-        segments.append(
-            Segment(
-                label=f"{label_discours} – phrase {i}",
-                texte=phrase,
-                id_phrase=i,
-            )
-        )
-    return segments
+    base = unicodedata.normalize("NFD", str(categorie)).encode("ascii", "ignore").decode("utf-8")
+    base = base.lower()
+    nettoye = "".join(ch if ch.isalnum() else "_" for ch in base)
+    nettoye = "_".join(filter(None, nettoye.split("_")))
+    return f"{prefixe}{nettoye}" if prefixe else nettoye
 
 
-def _ajouter_comptages(
-    df: pd.DataFrame,
-    *,
+def _ajouter_colonnes_booleennes(
+    df_phrases: pd.DataFrame,
+    df_detection: pd.DataFrame,
     colonne_categorie: str,
     prefixe: str,
-    segments: Sequence[Segment],
-    compteurs: Dict[str, Counter],
-    mode: str,
 ) -> None:
-    if df.empty:
+    """Crée des colonnes booléennes pour chaque catégorie détectée.
+
+    Les colonnes sont initialisées à False puis positionnées à True pour
+    les phrases concernées.
+    """
+
+    if df_detection.empty or colonne_categorie not in df_detection.columns:
         return
 
-    index_segment = {seg.id_phrase: seg.label for seg in segments if seg.id_phrase is not None}
-    label_discours = segments[0].label if segments else None
+    df_detection = df_detection.copy()
+    df_detection["id_phrase"] = (
+        pd.to_numeric(df_detection.get("id_phrase", 0), errors="coerce")
+        .fillna(0)
+        .astype(int)
+    )
 
-    for _, row in df.iterrows():
-        if mode == "Discours complet":
-            label = label_discours
-        else:
-            label = index_segment.get(row.get("id_phrase"))
-        if not label:
-            continue
-        categorie = str(row.get(colonne_categorie, "")).strip()
-        if not categorie:
-            continue
-        cle = f"{prefixe}{categorie.upper()}"
-        compteurs.setdefault(label, Counter())[cle] += 1
+    categories = sorted({cat for cat in df_detection[colonne_categorie].dropna().unique() if str(cat).strip()})
+    for cat in categories:
+        nom_colonne = _normaliser_nom_variable(prefixe, cat)
+        if nom_colonne not in df_phrases.columns:
+            df_phrases[nom_colonne] = False
+        ids = df_detection.loc[df_detection[colonne_categorie] == cat, "id_phrase"].tolist()
+        if ids:
+            df_phrases.loc[df_phrases["id_phrase"].isin(ids), nom_colonne] = True
 
 
-def _table_contingence(
-    segments: Sequence[Segment],
-    compteurs: Dict[str, Counter],
+def construire_df_phrases(
+    texte: str,
+    detections: Dict[str, pd.DataFrame],
+    libelle_discours: str,
 ) -> pd.DataFrame:
-    if not segments:
-        return pd.DataFrame()
+    """Construit un DataFrame par phrase avec colonnes booléennes pour marqueurs/connecteurs."""
 
-    toutes_colonnes = sorted({cle for c in compteurs.values() for cle in c})
-    if not toutes_colonnes:
-        return pd.DataFrame()
+    texte_norm = normaliser_espace(texte)
+    phrases = segmenter_en_phrases(texte_norm) if texte_norm else []
+    df_phrases = pd.DataFrame(
+        {
+            "id_phrase": list(range(1, len(phrases) + 1)),
+            "texte_phrase": phrases,
+            "discours": libelle_discours,
+        }
+    )
 
-    lignes = []
-    index = []
-    for seg in segments:
-        cpt = compteurs.get(seg.label, Counter())
-        lignes.append([cpt.get(col, 0) for col in toutes_colonnes])
-        index.append(seg.label)
-    return pd.DataFrame(lignes, index=index, columns=toutes_colonnes)
+    # Ajout des colonnes booléennes par catégorie de détection
+    _ajouter_colonnes_booleennes(df_phrases, detections.get("df_marq", pd.DataFrame()), "categorie", "marqueur_")
+    _ajouter_colonnes_booleennes(df_phrases, detections.get("df_conn", pd.DataFrame()), "code", "connecteur_")
+    _ajouter_colonnes_booleennes(df_phrases, detections.get("df_memoires", pd.DataFrame()), "categorie", "memoire_")
+    _ajouter_colonnes_booleennes(df_phrases, detections.get("df_causes_lex", pd.DataFrame()), "categorie", "cause_")
+    _ajouter_colonnes_booleennes(df_phrases, detections.get("df_consq_lex", pd.DataFrame()), "categorie", "consequence_")
+    _ajouter_colonnes_booleennes(df_phrases, detections.get("df_tensions", pd.DataFrame()), "tension", "tension_")
+
+    return df_phrases
 
 
-def _heatmap_contingence(table: pd.DataFrame) -> alt.Chart:
-    table_reset = table.reset_index().rename(columns={"index": "Segment"})
-    data = table_reset.melt(id_vars="Segment", var_name="Variable", value_name="Comptage")
-    return (
-        alt.Chart(data)
-        .mark_rect()
+def preparer_matrice_afc(
+    df_phrases: pd.DataFrame,
+    colonnes_marqueurs: Sequence[str],
+    min_df: int,
+) -> Tuple[pd.DataFrame, pd.DataFrame, CountVectorizer]:
+    """Filtre les phrases pertinentes et construit la matrice phrases × mots."""
+
+    if df_phrases.empty:
+        raise ValueError("Aucune phrase disponible pour l'AFC.")
+
+    colonnes_marqueurs = list(colonnes_marqueurs)
+    if not colonnes_marqueurs:
+        raise ValueError("Aucun marqueur ou connecteur sélectionné.")
+
+    manquantes = [col for col in colonnes_marqueurs if col not in df_phrases.columns]
+    if manquantes:
+        raise ValueError(f"Colonnes manquantes : {', '.join(manquantes)}")
+
+    masque_selection = df_phrases[colonnes_marqueurs].any(axis=1)
+    df_selection = df_phrases.loc[masque_selection].copy()
+    if df_selection.empty:
+        raise ValueError("Aucune phrase ne contient les marqueurs sélectionnés.")
+
+    labels = [f"{row.discours} – phrase {row.id_phrase}" for row in df_selection.itertuples()]
+    vectorizer = CountVectorizer(stop_words="french", min_df=min_df)
+    matrice_sparse = vectorizer.fit_transform(df_selection["texte_phrase"])
+    if matrice_sparse.shape[1] == 0:
+        raise ValueError("Aucun mot retenu après filtrage (stopwords ou fréquence minimale trop élevée).")
+
+    matrice_mots = pd.DataFrame(
+        matrice_sparse.toarray(),
+        index=labels,
+        columns=vectorizer.get_feature_names_out(),
+    )
+    return df_selection, matrice_mots, vectorizer
+
+
+def lancer_afc(matrice_mots: pd.DataFrame, n_composantes: int = 4) -> Tuple[pd.DataFrame, pd.DataFrame, prince.CA]:
+    """Applique l'AFC via prince et renomme les dimensions."""
+
+    ca = prince.CA(n_components=max(2, n_composantes), n_iter=10, copy=True, random_state=0)
+    ca = ca.fit(matrice_mots)
+    row_df = ca.row_coordinates(matrice_mots)
+    col_df = ca.column_coordinates(matrice_mots)
+
+    row_df.columns = [f"Dim {i+1}" for i in range(row_df.shape[1])]
+    col_df.columns = [f"Dim {i+1}" for i in range(col_df.shape[1])]
+    return row_df, col_df, ca
+
+
+def calculer_barycentres_marqueurs(
+    row_coords: pd.DataFrame,
+    df_phrases: pd.DataFrame,
+    colonnes_marqueurs: Sequence[str],
+    axe_x: int,
+    axe_y: int,
+) -> pd.DataFrame:
+    """Calcule les positions barycentriques des colonnes booléennes sélectionnées."""
+
+    colonnes = [col for col in colonnes_marqueurs if col in df_phrases.columns]
+    barycentres = []
+    for col in colonnes:
+        ids = df_phrases.loc[df_phrases[col], "label_afc"]
+        if ids.empty:
+            continue
+        coords_col = row_coords.loc[ids, [f"Dim {axe_x}", f"Dim {axe_y}"]].mean()
+        barycentres.append({
+            "libelle": col,
+            "Dim 1": coords_col.iloc[0],
+            "Dim 2": coords_col.iloc[1],
+            "Type": "Marqueur/Connecteur",
+        })
+    return pd.DataFrame(barycentres)
+
+
+def _extraire_mots_contributifs(
+    col_coords: pd.DataFrame,
+    axe_x: int,
+    axe_y: int,
+    nb_mots: int,
+) -> pd.DataFrame:
+    """Sélectionne les mots les plus éloignés de l'origine sur les axes demandés."""
+
+    if col_coords.empty:
+        return col_coords
+    dims = [f"Dim {axe_x}", f"Dim {axe_y}"]
+    scores = (col_coords[dims] ** 2).sum(axis=1)
+    principaux = scores.nlargest(nb_mots).index
+    return col_coords.loc[principaux, dims].reset_index().rename(columns={"index": "libelle"}).assign(Type="Mot")
+
+
+def tracer_nuage_factoriel(
+    row_coords: pd.DataFrame,
+    col_coords: pd.DataFrame,
+    df_phrases: pd.DataFrame,
+    coords_marqueurs: pd.DataFrame,
+    axe_x: int,
+    axe_y: int,
+    nb_mots: int,
+) -> alt.Chart:
+    """Construit le nuage factoriel (axes sélectionnés)."""
+
+    dims = [f"Dim {axe_x}", f"Dim {axe_y}"]
+
+    data_phrases = (
+        row_coords[dims]
+        .reset_index()
+        .rename(columns={"index": "libelle"})
+        .merge(df_phrases[["label_afc", "texte_phrase", "discours"]], left_on="libelle", right_on="label_afc", how="left")
+        .assign(Type="Phrase")
+    )
+
+    data_mots = _extraire_mots_contributifs(col_coords, axe_x, axe_y, nb_mots)
+    data_marqueurs = coords_marqueurs[["libelle", "Dim 1", "Dim 2", "Type"]] if not coords_marqueurs.empty else pd.DataFrame(columns=["libelle", "Dim 1", "Dim 2", "Type"])
+
+    couches = []
+    couleur = alt.condition(alt.datum.Type == "Phrase", alt.value("#1f77b4"), alt.value("#d62728"))
+
+    couches.append(
+        alt.Chart(data_phrases)
+        .mark_circle(size=80, opacity=0.75)
         .encode(
-            x=alt.X("Variable", sort=None),
-            y=alt.Y("Segment", sort=None),
-            color=alt.Color("Comptage", scale=alt.Scale(scheme="blues")),
-            tooltip=["Segment", "Variable", alt.Tooltip("Comptage", format="d")],
+            x=dims[0],
+            y=dims[1],
+            color=couleur,
+            tooltip=["libelle", "discours", "texte_phrase", alt.Tooltip(dims[0], format=".3f"), alt.Tooltip(dims[1], format=".3f")],
         )
-        .properties(height=260)
     )
 
-
-def _analyse_afc(table: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame, List[float]]:
-    """Calcule une AFC minimale (deux premiers axes)."""
-
-    n = table.values.sum()
-    if n <= 0:
-        raise ValueError("La table de contingence est vide.")
-
-    P = table / n
-    r = P.sum(axis=1)
-    c = P.sum(axis=0)
-
-    # Suppression des lignes/colonnes nulles pour éviter les divisions par zéro
-    lignes_valides = r > 0
-    colonnes_valides = c > 0
-    P = P.loc[lignes_valides, colonnes_valides]
-    r = P.sum(axis=1)
-    c = P.sum(axis=0)
-
-    R_inv = np.diag(1 / np.sqrt(r.values))
-    C_inv = np.diag(1 / np.sqrt(c.values))
-
-    deviation = P - np.outer(r, c)
-    S = R_inv @ deviation.values @ C_inv
-    U, singular_values, Vt = np.linalg.svd(S, full_matrices=False)
-
-    eigvals = (singular_values**2).tolist()
-    dims = min(2, len(singular_values))
-    inv_sv = np.diag(1 / singular_values[:dims])
-
-    row_coords = R_inv @ deviation.values @ C_inv @ Vt.T[:, :dims] @ inv_sv
-    col_coords = C_inv @ deviation.values.T @ R_inv @ U[:, :dims] @ inv_sv
-
-    row_df = pd.DataFrame(
-        row_coords,
-        index=P.index,
-        columns=[f"Dim {i+1}" for i in range(dims)],
-    )
-    col_df = pd.DataFrame(
-        col_coords,
-        index=P.columns,
-        columns=[f"Dim {i+1}" for i in range(dims)],
-    )
-    return row_df, col_df, eigvals
-
-
-def _scatter_afc(row_df: pd.DataFrame, col_df: pd.DataFrame) -> alt.Chart:
-    def _prep(df: pd.DataFrame, typ: str) -> pd.DataFrame:
-        return df.reset_index().rename(columns={"index": "libelle"}).assign(Type=typ)
-
-    data = pd.concat([_prep(row_df, "Segments"), _prep(col_df, "Variables")], ignore_index=True)
-    tooltip = ["libelle", "Type", alt.Tooltip("Dim 1", format=".3f"), alt.Tooltip("Dim 2", format=".3f")]
-    color = alt.condition(alt.datum.Type == "Segments", alt.value("#1f77b4"), alt.value("#d62728"))
-
-    return (
-        alt.Chart(data)
-        .mark_circle(size=120, opacity=0.8)
-        .encode(
-            x="Dim 1",
-            y="Dim 2",
-            color=color,
-            tooltip=tooltip,
+    if not data_mots.empty:
+        couches.append(
+            alt.Chart(data_mots)
+            .mark_text(color="#444", fontSize=12, dy=-6)
+            .encode(x="Dim 1", y="Dim 2", text="libelle", tooltip=["libelle", alt.Tooltip("Dim 1", format=".3f"), alt.Tooltip("Dim 2", format=".3f")])
         )
-        .properties(height=420)
-    )
+
+    if not data_marqueurs.empty:
+        couches.append(
+            alt.Chart(data_marqueurs)
+            .mark_point(shape="triangle", size=180, color="#f28e2c")
+            .encode(x="Dim 1", y="Dim 2", tooltip=["libelle", alt.Tooltip("Dim 1", format=".3f"), alt.Tooltip("Dim 2", format=".3f")])
+        )
+
+    return alt.layer(*couches).properties(height=480, width="container").resolve_scale(color="independent", shape="independent")
 
 
+# ===============================================================
+# Rendu Streamlit
+# ===============================================================
 def render_afc_tab(
     texte_source: str,
     texte_source_2: str,
@@ -192,181 +257,80 @@ def render_afc_tab(
     libelle_discours_1: str,
     libelle_discours_2: str,
 ) -> None:
+    """Rendu de l'onglet AFC (phrases × mots, variables illustratives marqueurs)."""
+
     st.subheader("Analyse factorielle des correspondances (AFC)")
     st.caption(
-        "Construisez une table de contingence à partir des marqueurs détectés, puis projetez les segments de discours et les variables dans un plan factoriel."
+        "Projection des phrases et du lexique, avec les marqueurs/connecteurs comme variables illustratives."
     )
 
-    mode = st.radio("Granularité des lignes", ["Discours complet", "Phrases"], horizontal=True)
-    st.markdown("**Variables incluses dans l'AFC**")
-    col1, col2, col3 = st.columns(3)
-    use_marqueurs = col1.checkbox("Marqueurs normatifs", value=True)
-    use_connecteurs = col1.checkbox("Connecteurs logiques", value=True)
-    use_memoires = col2.checkbox("Mémoire", value=True)
-    use_causes = col2.checkbox("Causes", value=True)
-    use_consqs = col3.checkbox("Conséquences", value=True)
-    use_tensions = col3.checkbox("Tensions sémantiques", value=True)
+    df_phrases_1 = construire_df_phrases(texte_source, detections_1, libelle_discours_1)
+    df_phrases_2 = construire_df_phrases(texte_source_2, detections_2, libelle_discours_2)
+    df_phrases = pd.concat([df_phrases_1, df_phrases_2], ignore_index=True)
 
-    segments_1 = _construire_segments(texte_source, libelle_discours_1, mode)
-    segments_2 = _construire_segments(texte_source_2, libelle_discours_2, mode)
-    segments = segments_1 + segments_2
-
-    if not segments:
-        st.info("Aucun segment disponible (veuillez charger ou saisir un discours).")
+    if df_phrases.empty:
+        st.info("Aucune phrase disponible pour lancer l'AFC.")
         return
 
-    compteurs: Dict[str, Counter] = {}
-
-    if use_marqueurs:
-        _ajouter_comptages(
-            detections_1.get("df_marq", pd.DataFrame()),
-            colonne_categorie="categorie",
-            prefixe="MARQ_",
-            segments=segments_1,
-            compteurs=compteurs,
-            mode=mode,
-        )
-        _ajouter_comptages(
-            detections_2.get("df_marq", pd.DataFrame()),
-            colonne_categorie="categorie",
-            prefixe="MARQ_",
-            segments=segments_2,
-            compteurs=compteurs,
-            mode=mode,
-        )
-
-    if use_connecteurs:
-        _ajouter_comptages(
-            detections_1.get("df_conn", pd.DataFrame()),
-            colonne_categorie="code",
-            prefixe="CONN_",
-            segments=segments_1,
-            compteurs=compteurs,
-            mode=mode,
-        )
-        _ajouter_comptages(
-            detections_2.get("df_conn", pd.DataFrame()),
-            colonne_categorie="code",
-            prefixe="CONN_",
-            segments=segments_2,
-            compteurs=compteurs,
-            mode=mode,
-        )
-
-    if use_memoires:
-        _ajouter_comptages(
-            detections_1.get("df_memoires", pd.DataFrame()),
-            colonne_categorie="categorie",
-            prefixe="MEM_",
-            segments=segments_1,
-            compteurs=compteurs,
-            mode=mode,
-        )
-        _ajouter_comptages(
-            detections_2.get("df_memoires", pd.DataFrame()),
-            colonne_categorie="categorie",
-            prefixe="MEM_",
-            segments=segments_2,
-            compteurs=compteurs,
-            mode=mode,
-        )
-
-    if use_causes:
-        _ajouter_comptages(
-            detections_1.get("df_causes_lex", pd.DataFrame()),
-            colonne_categorie="categorie",
-            prefixe="CAUSE_",
-            segments=segments_1,
-            compteurs=compteurs,
-            mode=mode,
-        )
-        _ajouter_comptages(
-            detections_2.get("df_causes_lex", pd.DataFrame()),
-            colonne_categorie="categorie",
-            prefixe="CAUSE_",
-            segments=segments_2,
-            compteurs=compteurs,
-            mode=mode,
-        )
-
-    if use_consqs:
-        _ajouter_comptages(
-            detections_1.get("df_consq_lex", pd.DataFrame()),
-            colonne_categorie="categorie",
-            prefixe="CONSQ_",
-            segments=segments_1,
-            compteurs=compteurs,
-            mode=mode,
-        )
-        _ajouter_comptages(
-            detections_2.get("df_consq_lex", pd.DataFrame()),
-            colonne_categorie="categorie",
-            prefixe="CONSQ_",
-            segments=segments_2,
-            compteurs=compteurs,
-            mode=mode,
-        )
-
-    if use_tensions:
-        _ajouter_comptages(
-            detections_1.get("df_tensions", pd.DataFrame()),
-            colonne_categorie="tension",
-            prefixe="TENS_",
-            segments=segments_1,
-            compteurs=compteurs,
-            mode=mode,
-        )
-        _ajouter_comptages(
-            detections_2.get("df_tensions", pd.DataFrame()),
-            colonne_categorie="tension",
-            prefixe="TENS_",
-            segments=segments_2,
-            compteurs=compteurs,
-            mode=mode,
-        )
-
-    table = _table_contingence(segments, compteurs)
-
-    if table.empty:
-        st.info("Aucune variable sélectionnée ou aucune occurrence détectée dans les segments.")
+    colonnes_marqueurs = [col for col in df_phrases.columns if df_phrases[col].dtype == bool]
+    if not colonnes_marqueurs:
+        st.info("Aucun marqueur ou connecteur détecté pour construire l'AFC.")
         return
 
-    st.markdown("### Table de contingence")
-    st.dataframe(table, use_container_width=True)
-    st.altair_chart(_heatmap_contingence(table), use_container_width=True)
-    st.download_button(
-        "Exporter la table (CSV)",
-        data=table.to_csv().encode("utf-8"),
-        file_name="table_afc.csv",
-        mime="text/csv",
-        key="dl_table_afc",
+    st.markdown("### Paramètres")
+    col_sel, col_freq, col_axes = st.columns([2, 1, 1])
+    selection_cols = col_sel.multiselect(
+        "Colonnes de marqueurs/connecteurs à utiliser",
+        options=sorted(colonnes_marqueurs),
+        default=sorted(colonnes_marqueurs),
     )
+    min_df = col_freq.slider("Fréquence minimale des mots", min_value=1, max_value=5, value=1, help="Nombre minimal de phrases dans lesquelles un mot doit apparaître pour être conservé.")
+    axe_x = int(col_axes.number_input("Axe X", min_value=1, max_value=4, value=1, step=1))
+    axe_y = int(col_axes.number_input("Axe Y", min_value=1, max_value=4, value=2, step=1))
+    nb_mots = col_axes.slider("Mots affichés", min_value=5, max_value=50, value=15, step=5)
+
+    if axe_x == axe_y:
+        st.warning("Veuillez sélectionner deux axes différents pour l'affichage.")
+        return
 
     try:
-        row_df, col_df, eigvals = _analyse_afc(table)
-    except Exception as exc:  # pragma: no cover - robustesse interactive
+        df_selection, matrice_mots, vectorizer = preparer_matrice_afc(df_phrases, selection_cols, min_df)
+    except Exception as exc:  # pragma: no cover - interaction Streamlit
+        st.error(f"Préparation impossible : {exc}")
+        return
+
+    df_selection = df_selection.copy()
+    df_selection["label_afc"] = [f"{row.discours} – phrase {row.id_phrase}" for row in df_selection.itertuples()]
+
+    try:
+        row_df, col_df, ca = lancer_afc(matrice_mots, n_composantes=max(axe_x, axe_y))
+    except Exception as exc:  # pragma: no cover - interaction Streamlit
         st.error(f"AFC impossible : {exc}")
         return
 
-    inertie_totale = float(sum(eigvals)) if eigvals else 0.0
-    inertie_nulle = inertie_totale <= 0 or math.isclose(inertie_totale, 0.0, abs_tol=1e-12)
-    if inertie_nulle:
-        st.warning(
-            "Inertie totale nulle : impossible de calculer les contributions des dimensions."
-        )
-        inertie_dim1 = 0.0
-        inertie_dim2 = 0.0
-    else:
-        inertie_dim1 = eigvals[0] / inertie_totale * 100 if eigvals else 0.0
-        inertie_dim2 = eigvals[1] / inertie_totale * 100 if len(eigvals) > 1 else 0.0
+    if max(axe_x, axe_y) > row_df.shape[1]:
+        st.warning("Le nombre d'axes demandé dépasse les dimensions disponibles pour l'AFC.")
+        return
+
+    coords_marqueurs = calculer_barycentres_marqueurs(row_df, df_selection, selection_cols, axe_x, axe_y)
+    chart = tracer_nuage_factoriel(row_df, col_df, df_selection, coords_marqueurs, axe_x, axe_y, nb_mots)
+
+    inertie = ca.eigenvalues_.sum()
+    inertie_dim1 = ca.explained_inertia_[axe_x - 1] * 100 if len(ca.explained_inertia_) >= axe_x else 0.0
+    inertie_dim2 = ca.explained_inertia_[axe_y - 1] * 100 if len(ca.explained_inertia_) >= axe_y else 0.0
 
     st.markdown(
-        f"**Inertie** – Dim 1 : {inertie_dim1:.1f}% · Dim 2 : {inertie_dim2:.1f}%"
+        f"**Inertie totale** : {inertie:.3f} · Dim {axe_x} : {inertie_dim1:.1f}% · Dim {axe_y} : {inertie_dim2:.1f}%"
     )
-    st.altair_chart(_scatter_afc(row_df, col_df), use_container_width=True)
+    st.altair_chart(chart, use_container_width=True)
 
-    st.markdown("### Coordonnées factorielles")
-    st.write("**Segments**")
-    st.dataframe(row_df, use_container_width=True)
-    st.write("**Variables**")
-    st.dataframe(col_df, use_container_width=True)
+    with st.expander("Coordonnées factorielles (phrases)"):
+        st.dataframe(row_df[[f"Dim {axe_x}", f"Dim {axe_y}"]], use_container_width=True)
+
+    with st.expander("Coordonnées factorielles (mots)"):
+        st.dataframe(col_df[[f"Dim {axe_x}", f"Dim {axe_y}"]], use_container_width=True)
+
+    if not coords_marqueurs.empty:
+        with st.expander("Positions des marqueurs/connecteurs (illustratifs)"):
+            st.dataframe(coords_marqueurs, use_container_width=True)
+
