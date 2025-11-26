@@ -7,7 +7,7 @@ pour visualiser le récit sous forme de scènes enchaînées.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Dict, Iterable, List, Sequence
+from typing import Dict, Iterable, List, Optional, Sequence
 import html
 
 import pandas as pd
@@ -93,11 +93,11 @@ def _determiner_type_scene(df_scene: pd.DataFrame) -> tuple[str, List[str]]:
     return type_retenu, sorted(marqueurs_dominants)
 
 
-def _resumer_bloc(phrases: Sequence[str], longueur_max: int = 160) -> str:
-    """Construit un court résumé à partir d'une liste de phrases."""
+def _resumer_bloc(phrases: Sequence[str], longueur_max: Optional[int] = None) -> str:
+    """Construit un résumé à partir d'une liste de phrases sans tronquer par défaut."""
 
     texte = " ".join([p for p in phrases if isinstance(p, str)]).strip()
-    if len(texte) > longueur_max:
+    if longueur_max is not None and len(texte) > longueur_max:
         return texte[:longueur_max].rstrip() + "…"
     return texte
 
