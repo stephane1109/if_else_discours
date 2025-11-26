@@ -140,8 +140,8 @@
   },
 
   "formule_triptyque_proposer_debattre_voter": {
-    "role_actanciel": "Dispositif narratif",
-    "description": "Formule récurrente qui distribue les rôles: le gouvernement propose, le Parlement débat, les parlementaires votent.",
+    "type": "formule_narrative",
+    "description": "Formule récurrente qui distribue les rôles (gouvernement, Parlement, vote) et scénarise la procédure: proposer / débattre / voter.",
     "formules_typiques": [
       "Le gouvernement proposera, nous débattrons, vous voterez",
       "Nous ferons des propositions, nous débattrons et à la fin, vous voterez",
@@ -155,8 +155,8 @@
   },
 
   "formule_suspendre_pour_mieux_faire": {
-    "role_actanciel": "Gestion de l'épreuve",
-    "description": "Formule qui met en scène la suspension d'une réforme comme moment de crise gérée, ouvrant un nouvel accord possible.",
+    "type": "formule_narrative",
+    "description": "Formule qui met en scène la suspension d'une réforme comme moment de crise maîtrisée ouvrant la voie à un nouvel accord.",
     "formules_typiques": [
       "Suspendre pour suspendre n'a aucun sens",
       "Suspendre la réforme n'a de sens que si c'est pour aller plus loin",
