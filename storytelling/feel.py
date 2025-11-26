@@ -105,7 +105,7 @@ def charger_lexique_feel(chemin: Optional[Path | str] = None) -> pd.DataFrame:
             ) from err
         return _normaliser_colonnes(df)
 
-    return pd.DataFrame(LEXIQUE_FEEL_REDUIT)
+    return _normaliser_colonnes(pd.DataFrame(LEXIQUE_FEEL_REDUIT))
 
 
 def _tokeniser_texte(texte: str) -> List[str]:
