@@ -762,12 +762,14 @@ def table_spacy_df(df_spacy: pd.DataFrame) -> pd.DataFrame:
 # Interface Streamlit
 # =========================
 st.set_page_config(
-    page_title="Discours → Code (Regex vs spaCy + dictionnaires JSON)",
+    page_title="Formalisation logique du langage naturel (connecteurs : Si / Alors / Sinon / Tant que + marqueurs + causes/conséquences",
     page_icon=None,
     layout="wide",
 )
 st.markdown(css_checkboxes_alignment(), unsafe_allow_html=True)
-st.title("Discours → Code : SI / ALORS / SINON / TANT QUE + marqueurs + causes/conséquences (Regex vs spaCy)")
+st.title(
+    "Formalisation logique du langage naturel (connecteurs : Si / Alors / Sinon / Tant que + marqueurs + causes/conséquences"
+)
 st.caption(
     "Vous pouvez récupérer deux fichiers texte (Discours de Politique Générale de Sébastien "
     "Lecornu devant l'Assemblée Nationale et le Sénat) pour tester l'interface : "
