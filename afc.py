@@ -266,6 +266,17 @@ def render_afc_tab(
 
     df_phrases_1 = construire_df_phrases(texte_source, detections_1, libelle_discours_1)
     df_phrases_2 = construire_df_phrases(texte_source_2, detections_2, libelle_discours_2)
+
+    bool_cols = set(df_phrases_1.select_dtypes(include="bool").columns).union(
+        df_phrases_2.select_dtypes(include="bool").columns
+    )
+    for df in (df_phrases_1, df_phrases_2):
+        for col in bool_cols:
+            if col not in df.columns:
+                df[col] = False
+            else:
+                df[col] = df[col].fillna(False).astype(bool)
+
     df_phrases = pd.concat([df_phrases_1, df_phrases_2], ignore_index=True)
 
     if df_phrases.empty:
