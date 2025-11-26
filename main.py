@@ -974,7 +974,7 @@ libelle_discours_2 = (
         "Lexique",
         "Comparatif règles Regex vs Spacy",
         "Annot",
-        "Storytelling du discours",
+        "Storytelling",
     ]
 )
 
@@ -1279,7 +1279,7 @@ with tab_stats:
     )
 
 with tab_storytelling:
-    st.subheader("Storytelling du discours")
+    st.subheader("Storytelling")
     st.caption(
         "Construction d'une narration par scènes à partir des phrases annotées, "
         "avec export du flowchart Mermaid prêt à être visualisé."

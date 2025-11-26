@@ -102,6 +102,42 @@ def _resumer_bloc(phrases: Sequence[str], longueur_max: int = 160) -> str:
     return texte
 
 
+def _couleur_motif(motif: str) -> str:
+    """Retourne une couleur hexadécimale associée à un motif narratif."""
+
+    palette = {
+        "cause_": "#2f855a",
+        "consequence_": "#b00020",
+        "tension_": "#7b1fa2",
+        "marqueur_obligation": "#a86600",
+        "marqueur_interdiction": "#c62828",
+        "marqueur_sanction": "#ad1457",
+        "memoire_": "#1565c0",
+        "marqueur_legitimation": "#3f51b5",
+        "marqueur_fonction": "#5e35b1",
+        "marqueur_permission": "#2e7d32",
+        "marqueur_recommandation": "#0d9488",
+    }
+
+    for prefixe, couleur in palette.items():
+        if motif.startswith(prefixe):
+            return couleur
+    return "#0b4f6c"
+
+
+def _styliser_marqueurs(marqueurs: List[str]) -> str:
+    """Retourne les marqueurs colorés via des balises span pour Mermaid."""
+
+    marqueurs_colors = []
+    for motif in marqueurs:
+        couleur = _couleur_motif(motif)
+        motif_esc = html.escape(motif, quote=False)
+        marqueurs_colors.append(
+            f'<span style="color:{couleur}; font-weight:600;">{motif_esc}</span>'
+        )
+    return ", ".join(marqueurs_colors)
+
+
 def _decouper_en_blocs(df_phrases: pd.DataFrame) -> List[List[int]]:
     """Crée des blocs de phrases à partir des cadres d'ouverture/fermeture."""
 
@@ -172,23 +208,26 @@ def construire_scenes_narratives(df_phrases: pd.DataFrame) -> List[SceneNarrativ
 def _format_label_scene(scene: SceneNarrative) -> str:
     """Formate le libellé affiché dans le noeud Mermaid."""
 
-    type_libelle = scene.type_scene.replace("_", " ").capitalize()
+    type_libelle = html.escape(scene.type_scene.replace("_", " ").capitalize(), quote=False)
     details = []
     if scene.marqueurs_dominants:
-        details.append(f"Marqueurs: {', '.join(scene.marqueurs_dominants)}")
+        marqueurs_colorises = _styliser_marqueurs(scene.marqueurs_dominants)
+        details.append(f"Marqueurs : {marqueurs_colorises}")
     if scene.resume:
-        details.append(scene.resume)
+        details.append(html.escape(scene.resume, quote=False))
     contenu = f"Scène {scene.id_scene[1:]} : {type_libelle}"
     if details:
-        contenu += "\n" + "\n".join(details)
-    contenu = html.escape(contenu).replace("\n", "<br/>")
+        contenu += "<br/>" + "<br/>".join(details)
     return contenu.replace('"', "\"")
 
 
 def generer_mermaid_flowchart(scenes: List[SceneNarrative]) -> str:
     """Génère un flowchart Mermaid linéaire à partir des scènes."""
 
-    lignes = ["flowchart TD"]
+    lignes = [
+        "%%{init: {'flowchart': {'htmlLabels': true}, 'themeVariables': {'fontFamily': 'Inter, Arial, sans-serif'}}}%%",
+        "flowchart TD",
+    ]
     if not scenes:
         lignes.append('    A["Aucune scène narrative détectée"]')
         return "\n".join(lignes)
