@@ -1,4 +1,4 @@
-"""Analyse de sentiments basée sur CamemBERT pour les discours."""
+"""Analyse de sentiments basée sur vaderSentiment-fr pour les discours."""
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -9,9 +9,6 @@ import pandas as pd
 import streamlit as st
 
 from text_utils import normaliser_espace, segmenter_en_phrases
-
-
-SENTIMENT_MODEL = "cmarkea/distilcamembert-base-sentiment"
 
 
 @dataclass
@@ -26,40 +23,34 @@ class SentimentResult:
 
 
 @st.cache_resource(show_spinner=False)
-def _charger_pipeline_sentiment(modele: str = SENTIMENT_MODEL):
-    """Charge la pipeline Hugging Face pour l'analyse de sentiments."""
-
-    from transformers import (
-        AutoModelForSequenceClassification,
-        AutoTokenizer,
-        pipeline,
-    )
+def _charger_pipeline_sentiment():
+    """Charge l'analyseur VADER adapté au français."""
 
     try:
-        tokenizer = AutoTokenizer.from_pretrained(modele)
-        model = AutoModelForSequenceClassification.from_pretrained(modele)
-        return pipeline(
-            "sentiment-analysis",
-            model=model,
-            tokenizer=tokenizer,
-            top_k=None,
-        )
-    except Exception as err:  # pragma: no cover - téléchargement réseau
+        from vaderSentiment_fr.vaderSentiment import SentimentIntensityAnalyzer
+    except Exception as err:  # pragma: no cover - dépendance manquante
         raise RuntimeError(
-            "Impossible de charger le modèle de sentiment Hugging Face"
-            f" '{modele}': {err}"
+            "Impossible d'importer vaderSentiment-fr pour l'analyse de sentiments"
+            f" : {err}"
+        ) from err
+
+    try:
+        return SentimentIntensityAnalyzer()
+    except Exception as err:  # pragma: no cover - initialisation improbable
+        raise RuntimeError(
+            "Impossible d'initialiser l'analyseur vaderSentiment-fr"
+            f" : {err}"
         ) from err
 
 
-def _label_to_valence(label: str) -> int:
-    """Associe une valence numérique à un label textuel."""
+def _label_valence_from_score(score: float) -> tuple[str, float]:
+    """Retourne le label textuel et la valence (compound) depuis un score VADER."""
 
-    label_low = label.lower()
-    if "pos" in label_low:
-        return 1
-    if "neg" in label_low:
-        return -1
-    return 0
+    if score >= 0.05:
+        return "positive", score
+    if score <= -0.05:
+        return "negative", score
+    return "neutral", score
 
 
 def analyser_sentiments_discours(
@@ -73,12 +64,12 @@ def analyser_sentiments_discours(
     if not phrases:
         return []
 
-    predictions = pipeline_sentiment(phrases, truncation=True)
     resultats: List[SentimentResult] = []
-    for idx, (phrase, pred) in enumerate(zip(phrases, predictions), start=1):
-        label_pred = pred.get("label", "neutral")
-        proba = float(pred.get("score", 0.0))
-        valence = _label_to_valence(label_pred) * proba
+    for idx, phrase in enumerate(phrases, start=1):
+        scores = pipeline_sentiment.polarity_scores(phrase)
+        compound = float(scores.get("compound", 0.0))
+        label_pred, valence = _label_valence_from_score(compound)
+        proba = abs(compound)
         resultats.append(
             SentimentResult(
                 id_phrase=idx,
@@ -120,10 +111,10 @@ def _afficher_intro_methodologie():
 
     st.markdown("### ASentiments")
     st.markdown(
-        "La méthode \"State of the Art\" (Hugging Face / CamemBERT)\n"
-        "Cette méthode utilise des Transformers (comme BERT, pour le français : CamemBERT ou FlauBERT)"
-        " qui comprennent le contexte (ex: \"C'est pas terrible\" est détecté comme négatif,"
-        " alors qu'un dictionnaire simple pourrait être confus par \"terrible\")."
+        "Analyse lexicale rapide (vaderSentiment-fr)\n"
+        "Cette méthode exploite l'adaptation française de VADER (Valence Aware Dictionary for Sentiment Reasoning),"
+        " un analyseur basé sur un lexique et des règles qui tient compte des intensifications, négations"
+        " et ponctuations pour estimer la valence des phrases."
     )
     st.markdown(
         "**Le Principe : La Courbe de Valence Émotionnelle**\n"
