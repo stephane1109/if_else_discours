@@ -324,11 +324,27 @@ def _proportions_temporelles(
             cle = (entree["emotion"], entree["polarite"])
             compteur[cle] = compteur.get(cle, 0) + 1
 
+        compteur_polarite: Dict[str, int] = {}
+        for (_, polarite), occ in compteur.items():
+            compteur_polarite[polarite] = compteur_polarite.get(polarite, 0) + occ
+
         for (emotion, polarite), occ in compteur.items():
             data.append(
                 {
                     "id_phrase": idx,
                     "emotion": emotion,
+                    "polarite": polarite,
+                    "proportion": occ / float(total_mentions),
+                    "occurrences": occ,
+                    "discours": discours,
+                }
+            )
+
+        for polarite, occ in compteur_polarite.items():
+            data.append(
+                {
+                    "id_phrase": idx,
+                    "emotion": f"polarité {polarite}",
                     "polarite": polarite,
                     "proportion": occ / float(total_mentions),
                     "occurrences": occ,
