@@ -384,6 +384,11 @@ def _afficher_intro_methodologie():
         " le dossier `dictionnaires/` pour une couverture maximale ou utilisez le"
         " lexique réduit intégré pour tester rapidement."
     )
+    st.markdown(
+        "Référence du modèle : [Le Lexique FEEL - fr](http://advanse.lirmm.fr/)."
+        " Les variantes BERT (CamemBERT) sont gourmandes en ressources et peuvent"
+        " être difficiles à faire tourner sur Streamlit Cloud."
+    )
 
 
 def _visualiser_scores(df: pd.DataFrame, titre: str):
