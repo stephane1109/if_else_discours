@@ -346,7 +346,13 @@ def _visualiser_proportions(df: pd.DataFrame, titre: str):
         st.info("Aucune émotion FEEL détectée pour construire le graphique temporel.")
         return
 
-    chart = (
+    df_polarites = (
+        df.groupby(["id_phrase", "polarite"], as_index=False)
+        .agg({"proportion": "sum", "occurrences": "sum", "discours": "first"})
+        .query("polarite.notnull()")
+    )
+
+    area_chart = (
         alt.Chart(df)
         .mark_area()
         .encode(
@@ -365,8 +371,25 @@ def _visualiser_proportions(df: pd.DataFrame, titre: str):
                 alt.Tooltip("proportion:Q", format=".2%"),
             ],
         )
-        .properties(title=titre)
     )
+
+    lignes_polarite = (
+        alt.Chart(df_polarites)
+        .mark_line(point=True, strokeDash=[4, 2], size=3)
+        .encode(
+            x=alt.X("id_phrase:Q", title="Temps (phrases)"),
+            y=alt.Y("proportion:Q", title="Proportion par polarité"),
+            color=alt.Color("polarite:N", title="Polarité"),
+            tooltip=[
+                "id_phrase",
+                "polarite",
+                "occurrences",
+                alt.Tooltip("proportion:Q", format=".2%"),
+            ],
+        )
+    )
+
+    chart = alt.layer(area_chart, lignes_polarite).properties(title=titre)
     st.altair_chart(chart, use_container_width=True)
 
 
