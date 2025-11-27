@@ -965,7 +965,6 @@ libelle_discours_2 = (
     tab_discours,
     tab_toulmin,
     tab_dicos,
-    tab_mapping,
     tab_lexique,
     tab_comparatif,
     tab_annot,
@@ -981,7 +980,6 @@ libelle_discours_2 = (
         "2 discours",
         "Arg Toulmin",
         "Dictionnaires (JSON)",
-        "Expressions mappées",
         "Lexique",
         "Comparatif règles Regex vs Spacy",
         "Annot",
@@ -1060,20 +1058,6 @@ with tab_dicos:
     bloc_dictionnaire("causes.json", "causes", DICO_CAUSES)
     bloc_dictionnaire("souvenirs.json", "souvenirs", DICO_MEMOIRES)
     bloc_dictionnaire("tension_semantique.json", "tensions", DICO_TENSIONS)
-
-# Onglet Expressions mappées
-with tab_mapping:
-    st.subheader("Expressions françaises mappées vers des règles conditionnelle (si / alors / sinon / tant que)")
-    if not DICO_CONNECTEURS:
-        st.info("Aucun Connecteur logique chargé.")
-    else:
-        df_map = pd.DataFrame(sorted([(k, v) for k, v in DICO_CONNECTEURS.items()], key=lambda x: (x[1], x[0])),
-                              columns=["expression_française", "famille_python"])
-        dataframe_safe(df_map, use_container_width=True, hide_index=True)
-        st.download_button("Exporter le mappage (CSV)",
-                           data=df_map.to_csv(index=False).encode("utf-8"),
-                           file_name="mapping_connecteurs_logiques.csv", mime="text/csv",
-                           key="dl_map_connecteurs_csv")
 
 # Onglet Lexique
 with tab_lexique:
