@@ -19,7 +19,10 @@ import streamlit as st
 from text_utils import normaliser_espace
 
 # Lexique minimal intégré pour fonctionner même sans fichier externe.
-# Les colonnes du CSV attendu : "lemme" (ou "word"), "emotion", "polarity".
+# Les colonnes du CSV attendu :
+# - format long : "lemme" (ou "word"), "emotion", "polarity".
+# - format large FEEL : "id", "word", "polarity", "joy", "fear",
+#   "sadness", "anger", "surprise", "disgust" (séparateur ";").
 LEXIQUE_FEEL_REDUIT = [
     {"lemme": "joie", "emotion": "joy", "polarity": "positive"},
     {"lemme": "bonheur", "emotion": "joy", "polarity": "positive"},
@@ -61,7 +64,14 @@ _DEF_CHEMIN_FEEL = Path(__file__).resolve().parent.parent / "dictionnaires" / "f
 
 
 def _normaliser_colonnes(df: pd.DataFrame) -> pd.DataFrame:
-    """Uniformise les colonnes attendues du lexique FEEL."""
+    """Uniformise les colonnes attendues du lexique FEEL.
+
+    Le CSV peut être livré soit en format « long » (colonnes ``lemme``,
+    ``emotion``, ``polarite``), soit en format « large » utilisé par le
+    lexique FEEL officiel avec une colonne par émotion. Dans ce dernier cas,
+    la fonction déplie les émotions présentes (valeur non nulle) et conserve
+    la polarité associée.
+    """
 
     df = df.copy()
     colonnes_equivalentes: Dict[str, str] = {
@@ -71,11 +81,38 @@ def _normaliser_colonnes(df: pd.DataFrame) -> pd.DataFrame:
         "valence": "polarite",
     }
     df.rename(columns=colonnes_equivalentes, inplace=True)
-    colonnes_manquantes = {"lemme", "emotion", "polarite"} - set(df.columns)
-    if colonnes_manquantes:
-        raise FeelLexiqueErreur(
-            "Le lexique FEEL doit contenir les colonnes 'lemme', 'emotion' et 'polarite'."
+
+    colonnes_emotions = ["joy", "fear", "sadness", "anger", "surprise", "disgust"]
+    colonnes_large = set(colonnes_emotions).issubset(df.columns)
+
+    if "emotion" not in df.columns and colonnes_large:
+        if "lemme" not in df.columns:
+            raise FeelLexiqueErreur(
+                "Le lexique FEEL doit contenir une colonne 'lemme' ou 'word'."
+            )
+        if "polarite" not in df.columns:
+            raise FeelLexiqueErreur(
+                "Le lexique FEEL doit contenir une colonne 'polarity' ou 'polarite'."
+            )
+
+        df = (
+            df.melt(
+                id_vars=["lemme", "polarite"],
+                value_vars=colonnes_emotions,
+                var_name="emotion",
+                value_name="score",
+            )
+            .loc[lambda d: d["score"].fillna(0) != 0]
+            .drop(columns=["score"])
         )
+    else:
+        colonnes_manquantes = {"lemme", "emotion", "polarite"} - set(df.columns)
+        if colonnes_manquantes:
+            raise FeelLexiqueErreur(
+                "Le lexique FEEL doit contenir les colonnes 'lemme', 'emotion' et 'polarite'."
+            )
+
+        df = df[["lemme", "emotion", "polarite"]]
 
     df["lemme"] = df["lemme"].astype(str).str.lower().str.strip()
     df["emotion"] = df["emotion"].astype(str).str.lower().str.strip()
@@ -99,6 +136,8 @@ def charger_lexique_feel(chemin: Optional[Path | str] = None) -> pd.DataFrame:
     if chemin and Path(chemin).exists():
         try:
             df = pd.read_csv(chemin)
+            if df.shape[1] == 1 and df.columns[0].count(";") >= 2:
+                df = pd.read_csv(chemin, sep=";")
         except Exception as err:  # pragma: no cover - dépendance externe
             raise FeelLexiqueErreur(
                 f"Impossible de charger le lexique FEEL depuis {chemin} : {err}"
