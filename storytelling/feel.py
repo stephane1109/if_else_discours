@@ -223,17 +223,15 @@ def _scores_en_dataframe(scores: Iterable[EmotionScore]) -> pd.DataFrame:
     return pd.DataFrame(data)
 
 
-def _annoter_texte_avec_emotions(texte: str, lexique: pd.DataFrame):
-    """Affiche le texte original en surlignant les lexèmes annotés FEEL."""
+def _construire_html_texte_annotes(texte: str, lexique: pd.DataFrame) -> str:
+    """Construit le HTML du texte original avec les lexèmes annotés FEEL."""
 
     if not texte.strip() or lexique.empty:
-        st.info("Aucun texte ou lexique FEEL pour afficher des étiquettes.")
-        return
+        return ""
 
     index_lexique = _indexer_lexique(lexique)
     if not index_lexique:
-        st.info("Aucune entrée valide dans le lexique FEEL.")
-        return
+        return ""
 
     fragments: List[str] = []
     last_end = 0
@@ -247,12 +245,8 @@ def _annoter_texte_avec_emotions(texte: str, lexique: pd.DataFrame):
             emotion_principale = entrees[0]["emotion"]
             couleur = EMOTION_COLORS.get(emotion_principale, "#bbbbbb")
             fragments.append(
-                """
-                <span style="background-color:{couleur}; padding:2px 6px; border-radius:6px;">
-                    {mot}
-                    <small style="opacity:0.8;">({etiquettes})</small>
-                </span>
-                """.format(
+                "<span style=\"background-color:{couleur}; padding:2px 6px; border-radius:6px;\">"
+                "{mot}<small style=\"opacity:0.8;\">({etiquettes})</small></span>".format(
                     couleur=couleur,
                     mot=html.escape(match.group(0)),
                     etiquettes=html.escape(", ".join(sorted(etiquettes))),
@@ -263,7 +257,19 @@ def _annoter_texte_avec_emotions(texte: str, lexique: pd.DataFrame):
         last_end = end
 
     fragments.append(html.escape(texte[last_end:]))
-    st.markdown("".join(fragments), unsafe_allow_html=True)
+    return "".join(fragments)
+
+
+def _annoter_texte_avec_emotions(texte: str, lexique: pd.DataFrame):
+    """Affiche le texte original en surlignant les lexèmes annotés FEEL."""
+
+    html_annotes = _construire_html_texte_annotes(texte, lexique)
+    if not html_annotes:
+        st.info("Aucun texte ou lexique FEEL pour afficher des étiquettes.")
+        return html_annotes
+
+    st.markdown(html_annotes, unsafe_allow_html=True)
+    return html_annotes
 
 
 def _proportions_temporelles(
@@ -424,7 +430,14 @@ def render_feel_tab(
             _visualiser_scores(df_scores, titre=f"Distribution émotionnelle — {nom}")
 
             st.markdown("##### Texte annoté (étiquettes émotion/polarité)")
-            _annoter_texte_avec_emotions(contenu, lexique_feel)
+            html_annotes = _annoter_texte_avec_emotions(contenu, lexique_feel)
+            if html_annotes:
+                st.download_button(
+                    label="Télécharger le texte annoté (HTML)",
+                    data=html_annotes.encode("utf-8"),
+                    file_name=f"{nom}_feel.html",
+                    mime="text/html",
+                )
 
             st.markdown("##### Évolution temporelle des émotions/polarités")
             df_proportions = _proportions_temporelles(contenu, lexique_feel, nom)
