@@ -223,8 +223,16 @@ def _scores_en_dataframe(scores: Iterable[EmotionScore]) -> pd.DataFrame:
     return pd.DataFrame(data)
 
 
+def _etiquette_emotion_polarite(entree: Dict[str, str]) -> str:
+    """Formate une étiquette lisible pour une entrée du lexique."""
+
+    return f"{entree['emotion']} ({entree['polarite']})"
+
+
 def _construire_html_texte_annotes(
-    texte: str, lexique: pd.DataFrame, marqueurs_selectionnes: Optional[Set[str]] = None
+    texte: str,
+    lexique: pd.DataFrame,
+    etiquettes_selectionnees: Optional[Set[str]] = None,
 ) -> str:
     """Construit le HTML du texte original avec les lexèmes annotés FEEL."""
 
@@ -235,26 +243,29 @@ def _construire_html_texte_annotes(
     if not index_lexique:
         return ""
 
-    # Normalise les marqueurs sélectionnés pour un filtrage insensible à la casse.
-    marqueurs = {m.lower() for m in marqueurs_selectionnes} if marqueurs_selectionnes else None
-
     fragments: List[str] = []
     last_end = 0
     for match in re.finditer(r"[\wÀ-ÖØ-öø-ÿ'-]+", texte):
         start, end = match.span()
         fragments.append(html.escape(texte[last_end:start]))
         lemme = match.group(0).lower()
-        entrees = index_lexique.get(lemme, []) if marqueurs is None or lemme in marqueurs else []
-        if entrees:
-            etiquettes = {f"{e['emotion']} ({e['polarite']})" for e in entrees}
-            emotion_principale = entrees[0]["emotion"]
+        entrees = index_lexique.get(lemme, [])
+        etiquettes = {_etiquette_emotion_polarite(e) for e in entrees}
+        etiquettes_a_afficher = (
+            etiquettes if not etiquettes_selectionnees else etiquettes & etiquettes_selectionnees
+        )
+        if etiquettes_a_afficher:
+            entrees_filtrees = [
+                e for e in entrees if _etiquette_emotion_polarite(e) in etiquettes_a_afficher
+            ]
+            emotion_principale = entrees_filtrees[0]["emotion"]
             couleur = EMOTION_COLORS.get(emotion_principale, "#bbbbbb")
             fragments.append(
                 "<span style=\"background-color:{couleur}; padding:2px 6px; border-radius:6px;\">"
                 "{mot}<small style=\"opacity:0.8;\">({etiquettes})</small></span>".format(
                     couleur=couleur,
                     mot=html.escape(match.group(0)),
-                    etiquettes=html.escape(", ".join(sorted(etiquettes))),
+                    etiquettes=html.escape(", ".join(sorted(etiquettes_a_afficher))),
                 )
             )
         else:
@@ -266,11 +277,15 @@ def _construire_html_texte_annotes(
 
 
 def _annoter_texte_avec_emotions(
-    texte: str, lexique: pd.DataFrame, marqueurs_selectionnes: Optional[Set[str]] = None
+    texte: str,
+    lexique: pd.DataFrame,
+    etiquettes_selectionnees: Optional[Set[str]] = None,
 ):
     """Affiche le texte original en surlignant les lexèmes annotés FEEL."""
 
-    html_annotes = _construire_html_texte_annotes(texte, lexique, marqueurs_selectionnes)
+    html_annotes = _construire_html_texte_annotes(
+        texte, lexique, etiquettes_selectionnees=etiquettes_selectionnees
+    )
     if not html_annotes:
         st.info("Aucun texte ou lexique FEEL pour afficher des étiquettes.")
         return html_annotes
@@ -437,16 +452,26 @@ def render_feel_tab(
             _visualiser_scores(df_scores, titre=f"Distribution émotionnelle — {nom}")
 
             st.markdown("##### Texte annoté (étiquettes émotion/polarité)")
-            marqueurs_disponibles = sorted(lexique_feel["lemme"].dropna().unique())
-            selection_marqueurs = set(
+            etiquettes_disponibles = sorted(
+                {
+                    f"{emotion} ({polarite})"
+                    for emotion, polarite in lexique_feel[["emotion", "polarite"]]
+                    .dropna()
+                    .drop_duplicates()
+                    .itertuples(index=False)
+                }
+            )
+            selection_etiquettes = set(
                 st.multiselect(
-                    "Sélectionnez les marqueurs à surligner (laissez vide pour tout afficher)",
-                    marqueurs_disponibles,
-                    key=f"selection_marqueurs_{nom}",
+                    "Sélectionnez les étiquettes à surligner (laissez vide pour tout afficher)",
+                    etiquettes_disponibles,
+                    key=f"selection_etiquettes_{nom}",
                 )
             )
             html_annotes = _annoter_texte_avec_emotions(
-                contenu, lexique_feel, marqueurs_selectionnes=selection_marqueurs
+                contenu,
+                lexique_feel,
+                etiquettes_selectionnees=selection_etiquettes,
             )
             if html_annotes:
                 st.download_button(
