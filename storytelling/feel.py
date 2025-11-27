@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+import html
 import re
 from typing import Dict, Iterable, List, Optional
 
@@ -16,7 +17,7 @@ import altair as alt
 import pandas as pd
 import streamlit as st
 
-from text_utils import normaliser_espace
+from text_utils import normaliser_espace, segmenter_en_phrases
 
 # Lexique minimal intégré pour fonctionner même sans fichier externe.
 # Les colonnes du CSV attendu :
@@ -61,6 +62,16 @@ class FeelLexiqueErreur(RuntimeError):
 
 
 _DEF_CHEMIN_FEEL = Path(__file__).resolve().parent.parent / "dictionnaires" / "feel.csv"
+
+
+EMOTION_COLORS: Dict[str, str] = {
+    "joy": "#f6c445",
+    "anger": "#e15759",
+    "fear": "#8c6bb1",
+    "sadness": "#4e79a7",
+    "surprise": "#edc948",
+    "disgust": "#59a14f",
+}
 
 
 def _normaliser_colonnes(df: pd.DataFrame) -> pd.DataFrame:
@@ -156,6 +167,18 @@ def _tokeniser_texte(texte: str) -> List[str]:
     return tokens
 
 
+def _indexer_lexique(lexique: pd.DataFrame) -> Dict[str, List[Dict[str, str]]]:
+    """Prépare un index {lemme: [{emotion, polarite}, ...]} pour des accès rapides."""
+
+    if lexique.empty:
+        return {}
+    lexique_dedup = lexique.drop_duplicates(subset=["lemme", "emotion", "polarite"])
+    return {
+        lemme: lignes[["emotion", "polarite"]].to_dict("records")
+        for lemme, lignes in lexique_dedup.groupby("lemme")
+    }
+
+
 def analyser_emotions_feel(texte: str, lexique: pd.DataFrame, discours: str) -> List[EmotionScore]:
     """Calcule la distribution des émotions FEEL pour un discours."""
 
@@ -198,6 +221,125 @@ def _scores_en_dataframe(scores: Iterable[EmotionScore]) -> pd.DataFrame:
             columns=["emotion", "polarite", "occurrences", "poids", "discours"]
         )
     return pd.DataFrame(data)
+
+
+def _annoter_texte_avec_emotions(texte: str, lexique: pd.DataFrame):
+    """Affiche le texte original en surlignant les lexèmes annotés FEEL."""
+
+    if not texte.strip() or lexique.empty:
+        st.info("Aucun texte ou lexique FEEL pour afficher des étiquettes.")
+        return
+
+    index_lexique = _indexer_lexique(lexique)
+    if not index_lexique:
+        st.info("Aucune entrée valide dans le lexique FEEL.")
+        return
+
+    fragments: List[str] = []
+    last_end = 0
+    for match in re.finditer(r"[\wÀ-ÖØ-öø-ÿ'-]+", texte):
+        start, end = match.span()
+        fragments.append(html.escape(texte[last_end:start]))
+        lemme = match.group(0).lower()
+        entrees = index_lexique.get(lemme, [])
+        if entrees:
+            etiquettes = {f"{e['emotion']} ({e['polarite']})" for e in entrees}
+            emotion_principale = entrees[0]["emotion"]
+            couleur = EMOTION_COLORS.get(emotion_principale, "#bbbbbb")
+            fragments.append(
+                """
+                <span style="background-color:{couleur}; padding:2px 6px; border-radius:6px;">
+                    {mot}
+                    <small style="opacity:0.8;">({etiquettes})</small>
+                </span>
+                """.format(
+                    couleur=couleur,
+                    mot=html.escape(match.group(0)),
+                    etiquettes=html.escape(", ".join(sorted(etiquettes))),
+                )
+            )
+        else:
+            fragments.append(html.escape(match.group(0)))
+        last_end = end
+
+    fragments.append(html.escape(texte[last_end:]))
+    st.markdown("".join(fragments), unsafe_allow_html=True)
+
+
+def _proportions_temporelles(
+    texte: str, lexique: pd.DataFrame, discours: str
+) -> pd.DataFrame:
+    """Calcule la proportion des émotions/polarités par phrase."""
+
+    texte_norm = normaliser_espace(texte)
+    phrases = segmenter_en_phrases(texte_norm) if texte_norm else []
+    if not phrases or lexique.empty:
+        return pd.DataFrame(
+            columns=["id_phrase", "emotion", "polarite", "proportion", "occurrences", "discours"]
+        )
+
+    index_lexique = _indexer_lexique(lexique)
+    data: List[Dict[str, object]] = []
+
+    for idx, phrase in enumerate(phrases, start=1):
+        tokens = _tokeniser_texte(phrase)
+        mentions: List[Dict[str, str]] = []
+        for token in tokens:
+            mentions.extend(index_lexique.get(token, []))
+
+        total_mentions = len(mentions)
+        if total_mentions == 0:
+            continue
+
+        compteur: Dict[tuple[str, str], int] = {}
+        for entree in mentions:
+            cle = (entree["emotion"], entree["polarite"])
+            compteur[cle] = compteur.get(cle, 0) + 1
+
+        for (emotion, polarite), occ in compteur.items():
+            data.append(
+                {
+                    "id_phrase": idx,
+                    "emotion": emotion,
+                    "polarite": polarite,
+                    "proportion": occ / float(total_mentions),
+                    "occurrences": occ,
+                    "discours": discours,
+                }
+            )
+
+    return pd.DataFrame(data)
+
+
+def _visualiser_proportions(df: pd.DataFrame, titre: str):
+    """Affiche l'évolution temporelle des émotions/polarités."""
+
+    if df.empty:
+        st.info("Aucune émotion FEEL détectée pour construire le graphique temporel.")
+        return
+
+    chart = (
+        alt.Chart(df)
+        .mark_area()
+        .encode(
+            x=alt.X("id_phrase:Q", title="Temps (phrases)"),
+            y=alt.Y(
+                "proportion:Q",
+                stack="normalize",
+                title="Proportion normalisée des émotions détectées",
+            ),
+            color=alt.Color("emotion:N", title="Émotion"),
+            tooltip=[
+                "id_phrase",
+                "emotion",
+                "polarite",
+                "occurrences",
+                alt.Tooltip("proportion:Q", format=".2%"),
+            ],
+        )
+        .properties(title=titre)
+    )
+    st.altair_chart(chart, use_container_width=True)
 
 
 def _afficher_intro_methodologie():
@@ -280,3 +422,13 @@ def render_feel_tab(
                 use_container_width=True,
             )
             _visualiser_scores(df_scores, titre=f"Distribution émotionnelle — {nom}")
+
+            st.markdown("##### Texte annoté (étiquettes émotion/polarité)")
+            _annoter_texte_avec_emotions(contenu, lexique_feel)
+
+            st.markdown("##### Évolution temporelle des émotions/polarités")
+            df_proportions = _proportions_temporelles(contenu, lexique_feel, nom)
+            _visualiser_proportions(
+                df_proportions,
+                titre=f"Émotions FEEL au fil du discours — {nom}",
+            )
