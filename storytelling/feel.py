@@ -488,7 +488,41 @@ def render_feel_tab(
 
             st.markdown("##### Évolution temporelle des émotions/polarités")
             df_proportions = _proportions_temporelles(contenu, lexique_feel, nom)
-            _visualiser_proportions(
-                df_proportions,
-                titre=f"Émotions FEEL au fil du discours — {nom}",
+            etiquettes_proportions = sorted(
+                {
+                    f"{emotion} ({polarite})"
+                    for emotion, polarite in df_proportions[["emotion", "polarite"]]
+                    .dropna()
+                    .drop_duplicates()
+                    .itertuples(index=False)
+                }
             )
+            selection_proportions = set(
+                st.multiselect(
+                    "Choix des marqueurs/polarités à afficher",
+                    options=etiquettes_proportions,
+                    default=etiquettes_proportions,
+                    help="Filtrer le streamgraph par combinaison émotion/polarité.",
+                    key=f"selection_proportions_{nom}",
+                )
+            )
+            df_proportions_filtres = (
+                df_proportions[
+                    df_proportions.apply(
+                        lambda row: f"{row['emotion']} ({row['polarite']})"
+                        in selection_proportions,
+                        axis=1,
+                    )
+                ]
+                if selection_proportions
+                else df_proportions
+            )
+            if df_proportions_filtres.empty:
+                st.info(
+                    "Aucune émotion FEEL à afficher pour les marqueurs sélectionnés."
+                )
+            else:
+                _visualiser_proportions(
+                    df_proportions_filtres,
+                    titre=f"Émotions FEEL au fil du discours — {nom}",
+                )
