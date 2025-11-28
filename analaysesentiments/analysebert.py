@@ -16,7 +16,7 @@ def _charger_camembert_pipeline():
 
     try:
         tokenizer = AutoTokenizer.from_pretrained(
-            "cmarkea/distilcamembert-base", use_fast=False
+            "cmarkea/distilcamembert-base", use_fast=True
         )
         return pipeline(
             "fill-mask",
