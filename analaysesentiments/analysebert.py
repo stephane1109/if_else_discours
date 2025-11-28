@@ -199,6 +199,16 @@ def render_camembert_tab(
 
     st.markdown(
         """
+        Phrase exemple : "Mesdames et messieurs les parlementaires, il faut savoir tirer les bienfaits d'une crise."\
+        Approche par intelligence artificielle (CamemBERT) contre l'approche "dictionnaire" (VADER).\
+        Différence d'interprétation :
+        * VADER (Dictionnaire) : le mot "crise" ➡️ Négatif.
+        * CamemBERT (Contexte) : A lu la phrase entière ("tirer les bienfaits") ➡️ Positif (0.78).
+        """
+    )
+
+    st.markdown(
+        """
         **Comment fonctionne cette analyse ?**
 
         * Le modèle [CamemBERT](https://huggingface.co/cmarkea/distilcamembert-base-sentiment) est spécialisé pour le français.
