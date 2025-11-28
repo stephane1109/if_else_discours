@@ -5,7 +5,7 @@ from typing import Dict
 
 import pandas as pd
 import streamlit as st
-from transformers import AutoTokenizer, pipeline
+from transformers import AutoTokenizer, CamembertTokenizer, pipeline
 
 from text_utils import normaliser_espace
 
@@ -17,10 +17,14 @@ def _charger_camembert_pipeline():
     try:
         # Le tokenizer fast de CamemBERT peut échouer avec certaines versions de
         # `tokenizers` (vocabulaire manquant entraînant un `NoneType.endswith`).
-        # On force donc l'usage du tokenizer « slow », plus robuste ici.
-        tokenizer = AutoTokenizer.from_pretrained(
-            "cmarkea/distilcamembert-base", use_fast=False
-        )
+        # On force d'abord l'usage du tokenizer « slow » explicite, puis on
+        # retente via AutoTokenizer en mode non-fast si besoin.
+        try:
+            tokenizer = CamembertTokenizer.from_pretrained("cmarkea/distilcamembert-base")
+        except Exception:
+            tokenizer = AutoTokenizer.from_pretrained(
+                "cmarkea/distilcamembert-base", use_fast=False
+            )
         return pipeline(
             "fill-mask",
             model="cmarkea/distilcamembert-base",
