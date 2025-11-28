@@ -170,19 +170,17 @@ def _tracer_courbe_valence(df_sentiments: pd.DataFrame, fenetre: int):
 
 
 def _css_camembert_annotations() -> str:
-    return "\n".join(
-        [
-            "<style>",
-            ".cam-texte-annote { line-height: 1.7; font-size: 1.02rem; white-space: pre-wrap; }",
-            ".cam-annotation { display: block; padding: 0.5rem 0.65rem; margin: 0.4rem 0; border-radius: 0.5rem; border: 1px solid #ddd; }",
-            ".cam-phrase { margin-left: 0.4rem; display: inline-block; }",
-            ".cam-badge-valence { font-weight: 700; font-size: 0.92rem; }",
-            ".cam-valence-positive { background-color: #e9f7ef; border-color: #7cc78d; }",
-            ".cam-valence-neutral { background-color: #f6f6f6; border-color: #cfcfcf; }",
-            ".cam-valence-negative { background-color: #fde8e7; border-color: #f09a96; }",
-            "</style>",
-        ]
-    )
+    return """
+<style>
+    .cam-texte-annote { line-height: 1.7; font-size: 1.02rem; white-space: pre-wrap; }
+    .cam-annotation { display: block; padding: 0.5rem 0.65rem; margin: 0.4rem 0; border-radius: 0.5rem; border: 1px solid #ddd; }
+    .cam-phrase { margin-left: 0.4rem; display: inline-block; }
+    .cam-badge-valence { font-weight: 700; font-size: 0.92rem; }
+    .cam-valence-positive { background-color: #e9f7ef; border-color: #7cc78d; }
+    .cam-valence-neutral { background-color: #f6f6f6; border-color: #cfcfcf; }
+    .cam-valence-negative { background-color: #fde8e7; border-color: #f09a96; }
+</style>
+"""
 
 
 def _texte_annote_camembert(df_sentiments: pd.DataFrame) -> str:
