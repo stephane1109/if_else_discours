@@ -17,6 +17,20 @@ def _charger_camembert_pipeline():
     return pipeline("fill-mask", model="cmarkea/distilcamembert-base")
 
 
+def _precharger_si_demande():
+    """Précharge CamemBERT si l'utilisateur a activé le chargement automatique."""
+
+    if st.session_state.get("camembert_autoload") and not st.session_state.get(
+        "camembert_charge"
+    ):
+        with st.spinner(
+            "Chargement automatique du modèle CamemBERT activé, merci de patienter..."
+        ):
+            _charger_camembert_pipeline()
+        st.session_state["camembert_charge"] = True
+        st.success("CamemBERT a été téléchargé et initialisé automatiquement.")
+
+
 def _construire_df_predictions(predictions) -> pd.DataFrame:
     """Convertit les prédictions de CamemBERT en DataFrame lisible."""
 
@@ -67,6 +81,10 @@ def render_camembert_tab(
 
     if "camembert_charge" not in st.session_state:
         st.session_state["camembert_charge"] = False
+    if "camembert_autoload" not in st.session_state:
+        st.session_state["camembert_autoload"] = False
+
+    _precharger_si_demande()
 
     col_charger, col_inferer = st.columns([1, 2])
     with col_charger:
@@ -75,6 +93,15 @@ def render_camembert_tab(
                 _charger_camembert_pipeline()
             st.session_state["camembert_charge"] = True
             st.success("CamemBERT est prêt pour l'inférence.")
+
+        st.checkbox(
+            "Charger automatiquement CamemBERT à l'ouverture de l'onglet",
+            key="camembert_autoload",
+            help=(
+                "Permet de précharger le modèle dès l'accès à l'onglet pour limiter les erreurs "
+                "lors du lancement de l'application et éviter de charger plusieurs modèles simultanément."
+            ),
+        )
 
     if not st.session_state.get("camembert_charge"):
         st.info("Cliquez sur le bouton ci-dessus pour télécharger et initialiser CamemBERT avant l'analyse.")
