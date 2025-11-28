@@ -55,6 +55,7 @@ from storytelling.feel import render_feel_tab
 from streamlit_utils import dataframe_safe
 from text_utils import normaliser_espace, segmenter_en_phrases
 from annotations import render_annotation_tab
+from analaysesentiments.analysebert import render_camembert_tab
 
 BASE_DIR = Path(__file__).resolve().parent
 DICTIONNAIRES_DIR = BASE_DIR / "dictionnaires"
@@ -970,6 +971,7 @@ libelle_discours_2 = (
     tab_annot,
     tab_storytelling,
     tab_sentiments,
+    tab_camembert,
     tab_feel,
 ) = st.tabs(
     [
@@ -985,6 +987,7 @@ libelle_discours_2 = (
         "Annot",
         "Storytelling",
         "ASentiments",
+        "AnalysSentCamemBert",
         "FEEL",
     ]
 )
@@ -1373,6 +1376,14 @@ with tab_storytelling:
 
 with tab_sentiments:
     render_sentiments_tab(
+        texte_source,
+        texte_source_2,
+        libelle_discours_1,
+        libelle_discours_2,
+    )
+
+with tab_camembert:
+    render_camembert_tab(
         texte_source,
         texte_source_2,
         libelle_discours_1,
