@@ -179,7 +179,7 @@ def render_sentiments_tab(
     fenetre = st.slider(
         "Taille de la moyenne glissante (en nombre de phrases)",
         min_value=3,
-        max_value=15,
+        max_value=50,
         value=5,
         step=1,
     )
