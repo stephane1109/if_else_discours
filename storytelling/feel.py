@@ -406,7 +406,6 @@ def _afficher_intro_methodologie():
         " relatif par rapport au nombre total de mots."
     )
     st.markdown("Référence du modèle : Le Lexique FEEL - fr")
-    )
 
 
 def _visualiser_scores(df: pd.DataFrame, titre: str):
