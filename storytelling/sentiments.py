@@ -109,29 +109,30 @@ def _ajouter_lissage(df: pd.DataFrame, fenetre: int) -> pd.DataFrame:
 def _afficher_intro_methodologie():
     """Affiche le texte méthodologique demandé."""
 
-    st.markdown("### ASentiments")
+    st.markdown("### ASentsVader")
     st.markdown(
-        "Analyse lexicale rapide (vaderSentiment-fr)\n"
-        "Cette méthode exploite l'adaptation française de VADER (Valence Aware Dictionary for Sentiment Reasoning),"
-        " un analyseur basé sur un lexique et des règles qui tient compte des intensifications, négations"
-        " et ponctuations pour estimer la valence des phrases."
-    )
-    st.markdown(
-        "**Le Principe : La Courbe de Valence Émotionnelle**\n"
-        "Pour construire ce graph, le script doit attribuer un score à chaque phrase (ou segment de texte) :\n"
-        "- Axe X (Temps) : Le déroulement du discours (du début à la fin).\n"
-        "- Axe Y (Valence) : L'axe émotionnel.\n"
-        "    - Haut (+) : Chance, Espoir, Solution, Joie, Force.\n"
-        "    - Bas (-) : Malchance, Péril, Problème, Tristesse, Faiblesse.\n\n"
-        "Les données brutes (phrase par phrase) donnent un graph illisible (du \"bruit\")."
-        " Le secret est d'utiliser une moyenne glissante (smoothing) sur 5 ou 10 phrases pour"
-        " voir apparaître la courbe réelle."
-    )
-    st.markdown(
-        "**Les Formes Géométriques Types (Visualisation) - exemples :**\n"
-        "- La Forme \"Man in a Hole\" (L'Homme dans le trou) — courbe en V ou en U.\n"
-        "- La Forme \"Icarus\" (La Tragédie) — courbe en V inversé (Montée puis Chute).\n"
-        "- La Forme \"Rags to Riches\" (L'Ascension / La Rampe)."
+        """
+        Analyse de Sentiments avec le dictionnaire VADER
+
+        Analyse lexicale avec vaderSentiment-fr.
+        Cette méthode exploite l'adaptation française de VADER (Valence Aware Dictionary for Sentiment Reasoning), basée sur un lexique et des règles pour estimer la valence des phrases.
+
+        La Courbe de Valence Émotionnelle 
+        Pour construire ce graph, le script doit attribuer un score à chaque phrase :
+
+            Axe X (Temps) : Le déroulement du discours (du début à la fin).
+            Axe Y (Valence) : L'axe émotionnel.
+                Haut (+) : Chance, Espoir, Solution, Joie, Force....
+                Bas (-) : Malchance, Péril, Problème, Tristesse, Faiblesse....
+
+        Les données brutes (phrase par phrase) donnent un graph avec beaucoup de "bruit". On peut corriger cela avec la moyenne glissante (smoothing) sur 5 ou x phrases pour voir apparaître une courbe "smooth" .
+
+        Visualisation - exemples :
+
+            La Forme "Man in a Hole" (L'Homme dans le trou) — courbe en V ou en U.
+            La Forme "Icarus" (La Tragédie) — courbe en V inversé (Montée puis Chute).
+            La Forme "Rags to Riches" (L'Ascension / La Rampe).
+        """
     )
 
 
