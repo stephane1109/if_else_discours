@@ -11,6 +11,17 @@ from transformers import AutoTokenizer, CamembertTokenizer, pipeline
 from text_utils import normaliser_espace, segmenter_en_phrases
 
 
+STAR_TO_VALENCE = {
+    "1 star": "negative",
+    "2 stars": "negative",
+    "3 stars": "neutral",
+    "4 stars": "positive",
+    "5 stars": "positive",
+}
+
+VALEUR_BADGES = {"positive": "🟢", "negative": "🔴", "neutral": "⚪"}
+
+
 @st.cache_resource(show_spinner=False)
 def _charger_camembert_pipeline():
     """Charge la pipeline CamemBERT pour la classification de sentiments."""
@@ -42,23 +53,36 @@ def _construire_df_sentiments(phrases: List[str], predictions) -> pd.DataFrame:
 
     if not predictions:
         return pd.DataFrame(
-            columns=["id_phrase", "texte_phrase", "label", "score"]
+            columns=["id_phrase", "texte_phrase", "valence", "score_valence"]
         )
 
     lignes = []
     for idx, (phrase, scores) in enumerate(zip(phrases, predictions), start=1):
         if not scores:
             continue
-        meilleure = max(scores, key=lambda s: s.get("score", 0))
+
+        scores_valence = {"positive": 0.0, "neutral": 0.0, "negative": 0.0}
+        for score in scores:
+            etiquette = score.get("label", "")
+            valence = STAR_TO_VALENCE.get(etiquette.lower())
+            if valence:
+                scores_valence[valence] += score.get("score", 0)
+
+        meilleure_valence = max(scores_valence, key=scores_valence.get)
         ligne = {
             "id_phrase": idx,
             "texte_phrase": phrase,
-            "label": meilleure.get("label", ""),
-            "score": meilleure.get("score", 0),
+            "valence": meilleure_valence,
+            "score_valence": scores_valence[meilleure_valence],
         }
+
+        for nom_valence, val in scores_valence.items():
+            ligne[f"score_{nom_valence}"] = val
+
         for score in scores:
-            etiquette = score.get("label", "").lower()
+            etiquette = score.get("label", "").lower().replace(" ", "_")
             ligne[f"score_{etiquette}"] = score.get("score", 0)
+
         lignes.append(ligne)
 
     return pd.DataFrame(lignes)
@@ -77,9 +101,20 @@ def _tracer_barres_scores(df_sentiments: pd.DataFrame):
         .mark_bar()
         .encode(
             x=alt.X("id_phrase:O", title="Phrase"),
-            y=alt.Y("score:Q", title="Score du label prédominant"),
-            color=alt.Color("label:N", title="Sentiment"),
-            tooltip=["id_phrase", "label", alt.Tooltip("score:Q", format=".3f")],
+            y=alt.Y("score_valence:Q", title="Score agrégé (valence)"),
+            color=alt.Color(
+                "valence:N",
+                title="Valence",
+                scale=alt.Scale(
+                    domain=["positive", "neutral", "negative"],
+                    range=["seagreen", "lightgray", "indianred"],
+                ),
+            ),
+            tooltip=[
+                "id_phrase",
+                "valence",
+                alt.Tooltip("score_valence:Q", format=".3f"),
+            ],
         )
         .properties(height=300, width="container")
     )
@@ -89,7 +124,9 @@ def _tracer_barres_scores(df_sentiments: pd.DataFrame):
 def _tracer_moyennes(df_sentiments: pd.DataFrame):
     """Affiche un graphique des moyennes des scores par sentiment."""
 
-    colonnes_scores = [col for col in df_sentiments.columns if col.startswith("score_")]
+    colonnes_scores = [
+        col for col in df_sentiments.columns if col in {"score_positive", "score_neutral", "score_negative"}
+    ]
     if not colonnes_scores:
         return
 
@@ -106,8 +143,14 @@ def _tracer_moyennes(df_sentiments: pd.DataFrame):
         .mark_bar()
         .encode(
             x=alt.X("sentiment:N", title="Sentiment"),
-            y=alt.Y("score:Q", title="Score moyen"),
-            color="sentiment:N",
+            y=alt.Y("score:Q", title="Score moyen agrégé"),
+            color=alt.Color(
+                "sentiment:N",
+                scale=alt.Scale(
+                    domain=["positive", "neutral", "negative"],
+                    range=["seagreen", "lightgray", "indianred"],
+                ),
+            ),
             tooltip=["sentiment", alt.Tooltip("score:Q", format=".3f")],
         )
         .properties(height=250, width="container")
@@ -150,7 +193,8 @@ def render_camembert_tab(
 
     st.markdown("### AnalysSentCamemBert")
     st.caption(
-        "Analyse de sentiments en français basée sur cmarkea/distilcamembert-base-sentiment."
+        "Analyse de sentiments en français basée sur cmarkea/distilcamembert-base-sentiment"
+        " (étiquettes étoiles regroupées en valence positive / neutre / négative)."
     )
 
     texte_cible = _selectionner_texte(texte_discours_1, texte_discours_2, nom_discours_1, nom_discours_2)
@@ -204,14 +248,10 @@ def render_camembert_tab(
 
             st.markdown("#### Texte annoté")
             for ligne in df_sentiments.itertuples():
-                badge = {
-                    "positive": "🟢",
-                    "negative": "🔴",
-                    "neutral": "⚪",
-                }.get(ligne.label.lower(), "🔎")
+                badge = VALEUR_BADGES.get(ligne.valence.lower(), "🔎")
                 st.markdown(
-                    f"{badge} **Phrase {ligne.id_phrase}** — {ligne.label}"
-                    f" (score {ligne.score:.3f}) : {ligne.texte_phrase}"
+                    f"{badge} **Phrase {ligne.id_phrase}** — {ligne.valence}"
+                    f" (score {ligne.score_valence:.3f}) : {ligne.texte_phrase}"
                 )
 
             st.markdown("#### Tableau des scores")
