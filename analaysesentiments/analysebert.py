@@ -221,6 +221,15 @@ def render_camembert_tab(
     texte_cible = _selectionner_texte(texte_discours_1, texte_discours_2, nom_discours_1, nom_discours_2)
     texte_cible = normaliser_espace(texte_cible)
 
+    seuil_affichage = st.slider(
+        "Seuil minimal de probabilité (valence agrégée)",
+        min_value=0.0,
+        max_value=1.0,
+        value=0.2,
+        step=0.01,
+        help="Les phrases dont le score agrégé est inférieur à ce seuil sont masquées dans les résultats.",
+    )
+
     if "camembert_pipe" not in st.session_state:
         st.session_state["camembert_pipe"] = None
 
@@ -258,14 +267,20 @@ def render_camembert_tab(
                 phrases, return_all_scores=True
             )
             df_sentiments = _construire_df_sentiments(phrases, predictions)
+            df_affiches = df_sentiments[df_sentiments["score_valence"] >= seuil_affichage]
 
         st.success("Analyse CamemBERT terminée.")
-        if df_sentiments.empty:
-            st.info("Aucun résultat disponible.")
+        if df_affiches.empty:
+            st.info("Aucun résultat atteint le seuil de probabilité sélectionné.")
             return
 
+        if len(df_affiches) < len(df_sentiments):
+            st.caption(
+                f"{len(df_affiches)} phrase(s) affichée(s) sur {len(df_sentiments)} après application du seuil."
+            )
+
         st.markdown("#### Texte annoté")
-        for ligne in df_sentiments.itertuples():
+        for ligne in df_affiches.itertuples():
             badge = VALEUR_BADGES.get(ligne.valence.lower(), "🔎")
             st.markdown(
                 f"{badge} **Phrase {ligne.id_phrase}** — {ligne.valence}"
@@ -273,8 +288,8 @@ def render_camembert_tab(
             )
 
         st.markdown("#### Tableau des scores")
-        st.dataframe(df_sentiments, use_container_width=True)
+        st.dataframe(df_affiches, use_container_width=True)
 
         st.markdown("#### Graphiques des sentiments")
-        _tracer_barres_scores(df_sentiments)
-        _tracer_moyennes(df_sentiments)
+        _tracer_barres_scores(df_affiches)
+        _tracer_moyennes(df_affiches)
