@@ -967,7 +967,6 @@ libelle_discours_2 = (
     tab_toulmin,
     tab_dicos,
     tab_lexique,
-    tab_comparatif,
     tab_annot,
     tab_storytelling,
     tab_sentiments,
@@ -983,7 +982,6 @@ libelle_discours_2 = (
         "Arg Toulmin",
         "Dictionnaires (JSON)",
         "Lexique",
-        "Comparatif règles Regex vs Spacy",
         "Annot",
         "Storytelling",
         "ASentiments",
@@ -991,6 +989,9 @@ libelle_discours_2 = (
         "FEEL",
     ]
 )
+
+# Onglet désactivé : Comparatif règles Regex vs spaCy
+tab_comparatif = None
 
 # Onglet Analyses (listes + texte annoté)
 with tab_detections:
@@ -1192,64 +1193,65 @@ with tab_conditions:
                     key="dl_conditions_spacy_csv",
                 )
 
-# Onglet Comparatif Regex / spaCy
-with tab_comparatif:
-    st.subheader("Comparatif des détections Causes/Conséquences : Regex vs spaCy")
+# Onglet Comparatif Regex / spaCy (désactivé)
+if tab_comparatif is not None:
+    with tab_comparatif:
+        st.subheader("Comparatif des détections Causes/Conséquences : Regex vs spaCy")
 
-    if not texte_source.strip():
-        st.info("Aucun texte fourni.")
-    else:
-        # 1) Regex — CAUSE
-        st.markdown("**Détections Regex — CAUSE**")
-        if not use_regex_cc:
-            st.info("Méthode Regex désactivée (voir barre latérale).")
+        if not texte_source.strip():
+            st.info("Aucun texte fourni.")
         else:
-            if df_causes_lex.empty:
-                st.info("Aucune CAUSE trouvée par Regex.")
+            # 1) Regex — CAUSE
+            st.markdown("**Détections Regex — CAUSE**")
+            if not use_regex_cc:
+                st.info("Méthode Regex désactivée (voir barre latérale).")
             else:
-                df_view_cause = table_regex_df(df_causes_lex, "CAUSE")
-                dataframe_safe(df_view_cause, use_container_width=True, hide_index=True)
+                if df_causes_lex.empty:
+                    st.info("Aucune CAUSE trouvée par Regex.")
+                else:
+                    df_view_cause = table_regex_df(df_causes_lex, "CAUSE")
+                    dataframe_safe(df_view_cause, use_container_width=True, hide_index=True)
 
-        st.markdown("---")
+            st.markdown("---")
 
-        # 2) Regex — CONSEQUENCE
-        st.markdown("**Détections Regex — CONSEQUENCE**")
-        if not use_regex_cc:
-            st.info("Méthode Regex désactivée (voir barre latérale).")
-        else:
-            if df_consq_lex.empty:
-                st.info("Aucune CONSEQUENCE trouvée par Regex.")
+            # 2) Regex — CONSEQUENCE
+            st.markdown("**Détections Regex — CONSEQUENCE**")
+            if not use_regex_cc:
+                st.info("Méthode Regex désactivée (voir barre latérale).")
             else:
-                df_view_consq = table_regex_df(df_consq_lex, "CONSEQUENCE")
-                dataframe_safe(df_view_consq, use_container_width=True, hide_index=True)
+                if df_consq_lex.empty:
+                    st.info("Aucune CONSEQUENCE trouvée par Regex.")
+                else:
+                    df_view_consq = table_regex_df(df_consq_lex, "CONSEQUENCE")
+                    dataframe_safe(df_view_consq, use_container_width=True, hide_index=True)
 
-        st.markdown("---")
+            st.markdown("---")
 
-        # 3) spaCy — CAUSE → CONSÉQUENCE
-        st.markdown("**Détections spaCy — CAUSE → CONSÉQUENCE**")
-        if use_spacy_cc and SPACY_OK and NLP is not None:
-            df_cc_spacy = extraire_cause_consequence_spacy(
-                texte_source,
-                NLP,
-                list(DICO_CAUSES.keys()),
-                list(DICO_CONSQS.keys())
-            )
-            if df_cc_spacy.empty:
-                st.info("Aucun lien trouvé par spaCy (selon les ancres fournies).")
-            else:
-                df_spacy_view = table_spacy_df(df_cc_spacy)
-                dataframe_safe(df_spacy_view, use_container_width=True, hide_index=True)
-                st.download_button(
-                    "Exporter CAUSE → CONSÉQUENCE (CSV)",
-                    data=df_spacy_view.to_csv(index=False).encode("utf-8"),
-                    file_name="cause_consequence_spacy.csv",
-                    mime="text/csv",
-                    key="dl_cc_spacy_csv"
+            # 3) spaCy — CAUSE → CONSÉQUENCE
+            st.markdown("**Détections spaCy — CAUSE → CONSÉQUENCE**")
+            if use_spacy_cc and SPACY_OK and NLP is not None:
+                df_cc_spacy = extraire_cause_consequence_spacy(
+                    texte_source,
+                    NLP,
+                    list(DICO_CAUSES.keys()),
+                    list(DICO_CONSQS.keys())
                 )
-        elif use_spacy_cc and not SPACY_OK:
-            st.warning("spaCy FR indisponible (installez un modèle français, par exemple 'fr_core_news_md').")
-        else:
-            st.info("Analyse spaCy désactivée.")
+                if df_cc_spacy.empty:
+                    st.info("Aucun lien trouvé par spaCy (selon les ancres fournies).")
+                else:
+                    df_spacy_view = table_spacy_df(df_cc_spacy)
+                    dataframe_safe(df_spacy_view, use_container_width=True, hide_index=True)
+                    st.download_button(
+                        "Exporter CAUSE → CONSÉQUENCE (CSV)",
+                        data=df_spacy_view.to_csv(index=False).encode("utf-8"),
+                        file_name="cause_consequence_spacy.csv",
+                        mime="text/csv",
+                        key="dl_cc_spacy_csv"
+                    )
+            elif use_spacy_cc and not SPACY_OK:
+                st.warning("spaCy FR indisponible (installez un modèle français, par exemple 'fr_core_news_md').")
+            else:
+                st.info("Analyse spaCy désactivée.")
 
 # Onglet Annot (création de dictionnaires à partir de surlignages)
 with tab_annot:
