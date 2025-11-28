@@ -16,7 +16,7 @@ def _charger_camembert_pipeline():
 
     try:
         tokenizer = AutoTokenizer.from_pretrained(
-            "cmarkea/distilcamembert-base", use_fast=False
+            "cmarkea/distilcamembert-base", use_fast=True
         )
         return pipeline(
             "fill-mask",
@@ -79,24 +79,23 @@ def render_camembert_tab(
     texte_cible = _selectionner_texte(texte_discours_1, texte_discours_2, nom_discours_1, nom_discours_2)
     texte_cible = normaliser_espace(texte_cible)
 
-    if "camembert_charge" not in st.session_state:
-        st.session_state["camembert_charge"] = False
+    if "camembert_pipe" not in st.session_state:
+        st.session_state["camembert_pipe"] = None
 
     col_charger, col_inferer = st.columns([1, 2])
     with col_charger:
         if st.button("Lancer l'import CamemBERT", type="primary"):
             with st.spinner("Import et initialisation du modèle CamemBERT..."):
-                pipeline_camembert = _charger_camembert_pipeline()
+                st.session_state["camembert_pipe"] = _charger_camembert_pipeline()
 
-            if pipeline_camembert is None:
+            if st.session_state["camembert_pipe"] is None:
                 st.warning(
                     "Le modèle n'a pas pu être chargé. Vérifiez les dépendances puis réessayez."
                 )
             else:
-                st.session_state["camembert_charge"] = True
                 st.success("CamemBERT est prêt pour l'inférence.")
 
-    if not st.session_state.get("camembert_charge"):
+    if st.session_state.get("camembert_pipe") is None:
         st.info(
             "Cliquez sur le bouton ci-dessus pour importer et initialiser CamemBERT avant l'analyse."
         )
@@ -109,15 +108,13 @@ def render_camembert_tab(
     with col_inferer:
         if st.button("Lancer l'analyse CamemBERT"):
             with st.spinner("Inférence en cours..."):
-                pipe = _charger_camembert_pipeline()
-
-                if pipe is None:
+                if st.session_state.get("camembert_pipe") is None:
                     st.warning(
                         "Le modèle CamemBERT n'a pas été initialisé. Cliquez d'abord sur le bouton d'import."
                     )
                     return
 
-                predictions = pipe(texte_cible)
+                predictions = st.session_state["camembert_pipe"](texte_cible)
                 df_predictions = _construire_df_predictions(predictions)
             st.success("Analyse CamemBERT terminée.")
             if df_predictions.empty:
