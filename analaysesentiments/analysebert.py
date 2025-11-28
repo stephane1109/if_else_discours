@@ -108,9 +108,11 @@ def render_camembert_tab(
         )
         return
 
-    if "<mask>" not in texte_cible:
-        st.warning("Le texte doit contenir un jeton '<mask>' pour lancer la prédiction fill-mask.")
-        return
+    texte_contient_masque = "<mask>" in texte_cible
+    if not texte_contient_masque:
+        st.warning(
+            "Le texte doit contenir un jeton '<mask>' pour lancer la prédiction fill-mask."
+        )
 
     with col_inferer:
         if st.button("Lancer l'analyse CamemBERT"):
@@ -118,6 +120,12 @@ def render_camembert_tab(
                 if st.session_state.get("camembert_pipe") is None:
                     st.warning(
                         "Le modèle CamemBERT n'a pas été initialisé. Cliquez d'abord sur le bouton d'import."
+                    )
+                    return
+
+                if not texte_contient_masque:
+                    st.warning(
+                        "Le texte doit contenir un jeton '<mask>' pour lancer la prédiction fill-mask."
                     )
                     return
 
