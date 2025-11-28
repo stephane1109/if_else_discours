@@ -172,9 +172,24 @@ def _tracer_courbe_valence(df_sentiments: pd.DataFrame, fenetre: int):
 def _css_camembert_annotations() -> str:
     return """
 <style>
-    .cam-texte-annote { line-height: 1.7; font-size: 1.02rem; white-space: pre-wrap; }
-    .cam-annotation { display: block; padding: 0.5rem 0.65rem; margin: 0.4rem 0; border-radius: 0.5rem; border: 1px solid #ddd; }
-    .cam-phrase { margin-left: 0.4rem; display: inline-block; }
+    .cam-texte-annote {
+        line-height: 1.7;
+        font-size: 1.02rem;
+        white-space: pre-wrap;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.35rem;
+    }
+    .cam-annotation {
+        display: inline-flex;
+        align-items: flex-start;
+        padding: 0.5rem 0.65rem;
+        margin: 0.1rem 0;
+        border-radius: 0.5rem;
+        border: 1px solid #ddd;
+        color: #111;
+    }
+    .cam-phrase { margin-left: 0.4rem; display: inline-block; color: #111; }
     .cam-badge-valence { font-weight: 700; font-size: 0.92rem; }
     .cam-valence-positive { background-color: #e9f7ef; border-color: #7cc78d; }
     .cam-valence-neutral { background-color: #f6f6f6; border-color: #cfcfcf; }
