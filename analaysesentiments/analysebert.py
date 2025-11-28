@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from typing import Dict, List
 
+import html
+
 import pandas as pd
 import streamlit as st
 import altair as alt
@@ -167,6 +169,46 @@ def _tracer_courbe_valence(df_sentiments: pd.DataFrame, fenetre: int):
     st.altair_chart(chart, use_container_width=True)
 
 
+def _css_camembert_annotations() -> str:
+    return "\n".join(
+        [
+            "<style>",
+            ".cam-texte-annote { line-height: 1.7; font-size: 1.02rem; white-space: pre-wrap; }",
+            ".cam-annotation { display: block; padding: 0.5rem 0.65rem; margin: 0.4rem 0; border-radius: 0.5rem; border: 1px solid #ddd; }",
+            ".cam-phrase { margin-left: 0.4rem; display: inline-block; }",
+            ".cam-badge-valence { font-weight: 700; font-size: 0.92rem; }",
+            ".cam-valence-positive { background-color: #e9f7ef; border-color: #7cc78d; }",
+            ".cam-valence-neutral { background-color: #f6f6f6; border-color: #cfcfcf; }",
+            ".cam-valence-negative { background-color: #fde8e7; border-color: #f09a96; }",
+            "</style>",
+        ]
+    )
+
+
+def _texte_annote_camembert(df_sentiments: pd.DataFrame) -> str:
+    if df_sentiments.empty:
+        return "<div class='cam-texte-annote'>(Aucune phrase à afficher)</div>"
+
+    lignes = []
+    for ligne in df_sentiments.itertuples():
+        valence = str(ligne.valence).lower()
+        badge = VALEUR_BADGES.get(valence, "🔎")
+        classe_valence = f"cam-valence-{valence}"
+        texte_phrase = html.escape(str(ligne.texte_phrase))
+        lignes.append(
+            """
+            <div class='cam-annotation {classe}'>
+                <span class='cam-badge-valence'>{badge} {valence}</span>
+                <span class='cam-phrase'>{texte}</span>
+            </div>
+            """.format(
+                classe=classe_valence, badge=badge, valence=html.escape(valence), texte=texte_phrase
+            )
+        )
+
+    return "<div class='cam-texte-annote'>" + "".join(lignes) + "</div>"
+
+
 def _tracer_moyennes(df_sentiments: pd.DataFrame):
     """Affiche un graphique des moyennes des scores par sentiment."""
 
@@ -274,6 +316,7 @@ def render_camembert_tab(
         value=0.2,
         step=0.01,
         help="Les phrases dont le score agrégé est inférieur à ce seuil sont masquées dans les résultats.",
+        key="camembert_seuil_affichage",
     )
     st.caption(
         "Plus vous augmentez ce seuil, plus seules les phrases dont la valence est clairement"
@@ -281,17 +324,10 @@ def render_camembert_tab(
         " à tonalité plus nuancée."
     )
 
-    fenetre_lissage = st.slider(
-        "Taille de la moyenne glissante pour la courbe CamemBERT (en nombre de phrases)",
-        min_value=1,
-        max_value=30,
-        value=5,
-        step=1,
-        help="Augmenter cette valeur permet d'adoucir la courbe de valence affichée plus bas.",
-    )
-
     if "camembert_pipe" not in st.session_state:
         st.session_state["camembert_pipe"] = None
+    if "camembert_resultats" not in st.session_state:
+        st.session_state["camembert_resultats"] = None
 
     if st.button("Lancer l'import CamemBERT", type="primary"):
         with st.spinner("Import et initialisation du modèle CamemBERT..."):
@@ -310,6 +346,8 @@ def render_camembert_tab(
         )
         return
 
+    resultat_courant = st.session_state.get("camembert_resultats")
+
     if st.button("Lancer l'analyse CamemBERT"):
         with st.spinner("Inférence en cours..."):
             if st.session_state.get("camembert_pipe") is None:
@@ -327,30 +365,59 @@ def render_camembert_tab(
                 phrases, return_all_scores=True
             )
             df_sentiments = _construire_df_sentiments(phrases, predictions)
-            df_affiches = df_sentiments[df_sentiments["score_valence"] >= seuil_affichage]
+            st.session_state["camembert_resultats"] = {
+                "df_sentiments": df_sentiments,
+                "texte_source": texte_cible,
+            }
+            resultat_courant = st.session_state["camembert_resultats"]
 
-        st.success("Analyse CamemBERT terminée.")
-        if df_affiches.empty:
-            st.info("Aucun résultat atteint le seuil de probabilité sélectionné.")
-            return
+    if not resultat_courant:
+        st.info("Aucune analyse n'a encore été exécutée.")
+        return
 
-        if len(df_affiches) < len(df_sentiments):
-            st.caption(
-                f"{len(df_affiches)} phrase(s) affichée(s) sur {len(df_sentiments)} après application du seuil."
-            )
+    df_sentiments = resultat_courant["df_sentiments"]
+    df_affiches = df_sentiments[df_sentiments["score_valence"] >= seuil_affichage]
 
-        st.markdown("#### Texte annoté")
-        for ligne in df_affiches.itertuples():
-            badge = VALEUR_BADGES.get(ligne.valence.lower(), "🔎")
-            st.markdown(
-                f"{badge} **Phrase {ligne.id_phrase}** — {ligne.valence}"
-                f" (score {ligne.score_valence:.3f}) : {ligne.texte_phrase}"
-            )
+    st.success("Analyse CamemBERT terminée.")
+    if df_affiches.empty:
+        st.info("Aucun résultat atteint le seuil de probabilité sélectionné.")
+        return
 
-        st.markdown("#### Tableau des scores")
-        st.dataframe(df_affiches, use_container_width=True)
+    if len(df_affiches) < len(df_sentiments):
+        st.caption(
+            f"{len(df_affiches)} phrase(s) affichée(s) sur {len(df_sentiments)} après application du seuil."
+        )
 
-        st.markdown("#### Graphiques des sentiments")
-        _tracer_barres_scores(df_affiches)
-        _tracer_courbe_valence(df_affiches, fenetre_lissage)
-        _tracer_moyennes(df_affiches)
+    st.markdown(_css_camembert_annotations(), unsafe_allow_html=True)
+    st.markdown("#### Texte annoté")
+    fragment_html = _texte_annote_camembert(df_affiches)
+    st.markdown(fragment_html, unsafe_allow_html=True)
+    html_complet = (
+        "<!DOCTYPE html><html lang='fr'><head><meta charset='utf-8'/><title>Texte annoté CamemBERT</title>"
+        f"{_css_camembert_annotations()}</head><body>{fragment_html}</body></html>"
+    )
+    st.download_button(
+        "Télécharger le texte annoté (HTML)",
+        data=html_complet.encode("utf-8"),
+        file_name="texte_annote_camembert.html",
+        mime="text/html",
+        key="camembert_dl_html",
+    )
+
+    st.markdown("#### Tableau des scores")
+    st.dataframe(df_affiches, use_container_width=True)
+
+    st.markdown("#### Graphiques des sentiments")
+    _tracer_barres_scores(df_affiches)
+    st.markdown("##### Courbe CamemBERT")
+    fenetre_lissage = st.slider(
+        "Taille de la moyenne glissante pour la courbe CamemBERT (en nombre de phrases)",
+        min_value=1,
+        max_value=30,
+        value=5,
+        step=1,
+        help="Augmenter cette valeur permet d'adoucir la courbe de valence affichée ci-dessous.",
+        key="camembert_fenetre_lissage",
+    )
+    _tracer_courbe_valence(df_affiches, fenetre_lissage)
+    _tracer_moyennes(df_affiches)
