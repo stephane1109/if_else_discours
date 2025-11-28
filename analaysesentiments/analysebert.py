@@ -1,49 +1,118 @@
-"""Onglet d'analyse CamemBERT (fill-mask) pour l'application Streamlit."""
+"""Onglet d'analyse CamemBERT (classification de sentiments) pour l'application Streamlit."""
 from __future__ import annotations
 
-from typing import Dict
+from typing import Dict, List
 
 import pandas as pd
 import streamlit as st
+import altair as alt
 from transformers import AutoTokenizer, CamembertTokenizer, pipeline
 
-from text_utils import normaliser_espace
+from text_utils import normaliser_espace, segmenter_en_phrases
 
 
 @st.cache_resource(show_spinner=False)
 def _charger_camembert_pipeline():
-    """Charge la pipeline CamemBERT pour l'inférence fill-mask."""
+    """Charge la pipeline CamemBERT pour la classification de sentiments."""
 
     try:
-        # Le tokenizer fast de CamemBERT peut échouer avec certaines versions de
-        # `tokenizers` (vocabulaire manquant entraînant un `NoneType.endswith`).
-        # On force d'abord l'usage du tokenizer « slow » explicite, puis on
-        # retente via AutoTokenizer en mode non-fast si besoin.
         try:
-            tokenizer = CamembertTokenizer.from_pretrained("cmarkea/distilcamembert-base")
+            tokenizer = CamembertTokenizer.from_pretrained(
+                "cmarkea/distilcamembert-base-sentiment"
+            )
         except Exception:
             tokenizer = AutoTokenizer.from_pretrained(
-                "cmarkea/distilcamembert-base", use_fast=False
+                "cmarkea/distilcamembert-base-sentiment", use_fast=False
             )
         return pipeline(
-            "fill-mask",
-            model="cmarkea/distilcamembert-base",
+            "text-classification",
+            model="cmarkea/distilcamembert-base-sentiment",
             tokenizer=tokenizer,
         )
     except Exception as exc:  # pragma: no cover - uniquement déclenché en environnement Streamlit
         st.error(
-            "Impossible de charger CamemBERT (fill-mask). Vérifiez la connexion et les dépendances nécessaires."
+            "Impossible de charger CamemBERT (sentiment). Vérifiez la connexion et les dépendances nécessaires."
         )
         st.exception(exc)
         return None
 
 
-def _construire_df_predictions(predictions) -> pd.DataFrame:
-    """Convertit les prédictions de CamemBERT en DataFrame lisible."""
+def _construire_df_sentiments(phrases: List[str], predictions) -> pd.DataFrame:
+    """Convertit les scores du modèle en DataFrame lisible par phrase."""
 
     if not predictions:
-        return pd.DataFrame(columns=["token_str", "score", "sequence"])
-    return pd.DataFrame(predictions)[["token_str", "score", "sequence"]]
+        return pd.DataFrame(
+            columns=["id_phrase", "texte_phrase", "label", "score"]
+        )
+
+    lignes = []
+    for idx, (phrase, scores) in enumerate(zip(phrases, predictions), start=1):
+        if not scores:
+            continue
+        meilleure = max(scores, key=lambda s: s.get("score", 0))
+        ligne = {
+            "id_phrase": idx,
+            "texte_phrase": phrase,
+            "label": meilleure.get("label", ""),
+            "score": meilleure.get("score", 0),
+        }
+        for score in scores:
+            etiquette = score.get("label", "").lower()
+            ligne[f"score_{etiquette}"] = score.get("score", 0)
+        lignes.append(ligne)
+
+    return pd.DataFrame(lignes)
+
+
+def _tracer_barres_scores(df_sentiments: pd.DataFrame):
+    """Affiche un graphique Altair des scores par phrase."""
+
+    if df_sentiments.empty:
+        st.info("Aucune phrase à représenter.")
+        return
+
+    df_barres = df_sentiments.copy()
+    chart = (
+        alt.Chart(df_barres)
+        .mark_bar()
+        .encode(
+            x=alt.X("id_phrase:O", title="Phrase"),
+            y=alt.Y("score:Q", title="Score du label prédominant"),
+            color=alt.Color("label:N", title="Sentiment"),
+            tooltip=["id_phrase", "label", alt.Tooltip("score:Q", format=".3f")],
+        )
+        .properties(height=300, width="container")
+    )
+    st.altair_chart(chart, use_container_width=True)
+
+
+def _tracer_moyennes(df_sentiments: pd.DataFrame):
+    """Affiche un graphique des moyennes des scores par sentiment."""
+
+    colonnes_scores = [col for col in df_sentiments.columns if col.startswith("score_")]
+    if not colonnes_scores:
+        return
+
+    df_moyennes = (
+        df_sentiments[colonnes_scores]
+        .mean()
+        .reset_index()
+        .rename(columns={"index": "sentiment", 0: "score"})
+    )
+    df_moyennes["sentiment"] = df_moyennes["sentiment"].str.replace("score_", "")
+
+    chart = (
+        alt.Chart(df_moyennes)
+        .mark_bar()
+        .encode(
+            x=alt.X("sentiment:N", title="Sentiment"),
+            y=alt.Y("score:Q", title="Score moyen"),
+            color="sentiment:N",
+            tooltip=["sentiment", alt.Tooltip("score:Q", format=".3f")],
+        )
+        .properties(height=250, width="container")
+    )
+    st.altair_chart(chart, use_container_width=True)
 
 
 def _selectionner_texte(
@@ -67,8 +136,9 @@ def _selectionner_texte(
 
     contenu_initial = textes_disponibles.get(choix, "") if choix else ""
     return st.text_area(
-        "Texte (inclure un '<mask>' pour la prédiction)",
-        value=contenu_initial or "C'est <mask> de voir tout le monde aujourd'hui.",
+        "Texte à analyser",
+        value=contenu_initial
+        or "C'est formidable de voir tout le monde aujourd'hui pour échanger ensemble !",
         height=200,
     )
 
@@ -80,7 +150,7 @@ def render_camembert_tab(
 
     st.markdown("### AnalysSentCamemBert")
     st.caption(
-        "Télécharge et active CamemBERT (fill-mask) pour explorer rapidement les sentiments ou compléter des phrases."
+        "Analyse de sentiments en français basée sur cmarkea/distilcamembert-base-sentiment."
     )
 
     texte_cible = _selectionner_texte(texte_discours_1, texte_discours_2, nom_discours_1, nom_discours_2)
@@ -100,19 +170,13 @@ def render_camembert_tab(
                     "Le modèle n'a pas pu être chargé. Vérifiez les dépendances puis réessayez."
                 )
             else:
-                st.success("CamemBERT est prêt pour l'inférence.")
+                st.success("CamemBERT est prêt pour l'analyse de sentiments.")
 
     if st.session_state.get("camembert_pipe") is None:
         st.info(
             "Cliquez sur le bouton ci-dessus pour importer et initialiser CamemBERT avant l'analyse."
         )
         return
-
-    texte_contient_masque = "<mask>" in texte_cible
-    if not texte_contient_masque:
-        st.warning(
-            "Le texte doit contenir un jeton '<mask>' pour lancer la prédiction fill-mask."
-        )
 
     with col_inferer:
         if st.button("Lancer l'analyse CamemBERT"):
@@ -123,16 +187,36 @@ def render_camembert_tab(
                     )
                     return
 
-                if not texte_contient_masque:
-                    st.warning(
-                        "Le texte doit contenir un jeton '<mask>' pour lancer la prédiction fill-mask."
-                    )
+                if not texte_cible:
+                    st.warning("Veuillez saisir un texte avant de lancer l'analyse.")
                     return
 
-                predictions = st.session_state["camembert_pipe"](texte_cible)
-                df_predictions = _construire_df_predictions(predictions)
+                phrases = segmenter_en_phrases(texte_cible) or [texte_cible]
+                predictions = st.session_state["camembert_pipe"](
+                    phrases, return_all_scores=True
+                )
+                df_sentiments = _construire_df_sentiments(phrases, predictions)
+
             st.success("Analyse CamemBERT terminée.")
-            if df_predictions.empty:
-                st.info("Aucune prédiction disponible.")
-            else:
-                st.dataframe(df_predictions, use_container_width=True)
+            if df_sentiments.empty:
+                st.info("Aucun résultat disponible.")
+                return
+
+            st.markdown("#### Texte annoté")
+            for ligne in df_sentiments.itertuples():
+                badge = {
+                    "positive": "🟢",
+                    "negative": "🔴",
+                    "neutral": "⚪",
+                }.get(ligne.label.lower(), "🔎")
+                st.markdown(
+                    f"{badge} **Phrase {ligne.id_phrase}** — {ligne.label}"
+                    f" (score {ligne.score:.3f}) : {ligne.texte_phrase}"
+                )
+
+            st.markdown("#### Tableau des scores")
+            st.dataframe(df_sentiments, use_container_width=True)
+
+            st.markdown("#### Graphiques des sentiments")
+            _tracer_barres_scores(df_sentiments)
+            _tracer_moyennes(df_sentiments)
