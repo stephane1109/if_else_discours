@@ -391,19 +391,21 @@ def _afficher_intro_methodologie():
 
     st.markdown("### FEEL — French Expanded Emotion Lexicon")
     st.markdown(
-        "Le lexique FEEL propose une catégorisation émotionnelle fine (joie, colère, peur,"
-        " tristesse, surprise, dégoût) plutôt qu'une simple polarité positif/négatif."
+        "Contrairement aux Transformers (BERT, CamemBERT) qui \"lisent\" et \"comprennent\""
+        " le sens d'une phrase grâce notamment à une \"fenêtre d'attention\", le lexique FEEL"
+        " fonctionne sur un principe beaucoup plus basique qu'on appelle le \"Bag of Words\""
+        " (Sac de mots)."
+    )
+    st.markdown(
+        "FEEL n'utilise aucun \"modèle\" d'IA, c'est une ressource statique. C'est un fichier"
+        " csv contenant 14 000 mots qui sont catégorisés selon une émotion (joie, colère,"
+        " peur, tristesse, surprise, dégoût) associés à une polarité positive/négative."
     )
     st.markdown(
         "Le script calcule la fréquence des lexèmes présents dans le texte et leur poids"
-        " relatif par rapport au nombre total de mots. Chargez un CSV 'feel.csv' dans"
-        " le dossier `dictionnaires/` pour une couverture maximale ou utilisez le"
-        " lexique réduit intégré pour tester rapidement."
+        " relatif par rapport au nombre total de mots."
     )
-    st.markdown(
-        "Référence du modèle : [Le Lexique FEEL - fr](http://advanse.lirmm.fr/)."
-        " Les variantes BERT (CamemBERT) sont gourmandes en ressources et peuvent"
-        " être difficiles à faire tourner sur Streamlit Cloud."
+    st.markdown("Référence du modèle : Le Lexique FEEL - fr")
     )
 
 
