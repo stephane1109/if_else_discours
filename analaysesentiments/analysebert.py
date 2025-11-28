@@ -424,7 +424,7 @@ def render_camembert_tab(
     fenetre_lissage = st.slider(
         "Taille de la moyenne glissante pour la courbe CamemBERT (en nombre de phrases)",
         min_value=1,
-        max_value=30,
+        max_value=100,
         value=5,
         step=1,
         help="Augmenter cette valeur permet d'adoucir la courbe de valence affichée ci-dessous.",
