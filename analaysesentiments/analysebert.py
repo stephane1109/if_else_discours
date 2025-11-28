@@ -15,8 +15,11 @@ def _charger_camembert_pipeline():
     """Charge la pipeline CamemBERT pour l'inférence fill-mask."""
 
     try:
+        # Le tokenizer fast de CamemBERT peut échouer avec certaines versions de
+        # `tokenizers` (vocabulaire manquant entraînant un `NoneType.endswith`).
+        # On force donc l'usage du tokenizer « slow », plus robuste ici.
         tokenizer = AutoTokenizer.from_pretrained(
-            "cmarkea/distilcamembert-base", use_fast=True
+            "cmarkea/distilcamembert-base", use_fast=False
         )
         return pipeline(
             "fill-mask",
