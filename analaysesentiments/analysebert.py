@@ -194,13 +194,11 @@ def _texte_annote_camembert(df_sentiments: pd.DataFrame) -> str:
         classe_valence = f"cam-valence-{valence}"
         texte_phrase = html.escape(str(ligne.texte_phrase))
         lignes.append(
-            """
-            <div class='cam-annotation {classe}'>
-                <span class='cam-badge-valence'>{badge} {valence}</span>
-                <span class='cam-phrase'>{texte}</span>
-            </div>
-            """.format(
-                classe=classe_valence, badge=badge, valence=html.escape(valence), texte=texte_phrase
+            (
+                f"<div class='cam-annotation {classe_valence}'>"
+                f"<span class='cam-badge-valence'>{badge} {html.escape(valence)}</span>"
+                f"<span class='cam-phrase'>{texte_phrase}</span>"
+                "</div>"
             )
         )
 
