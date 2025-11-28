@@ -5,7 +5,7 @@ from typing import Dict
 
 import pandas as pd
 import streamlit as st
-from transformers import pipeline
+from transformers import AutoTokenizer, pipeline
 
 from text_utils import normaliser_espace
 
@@ -15,10 +15,13 @@ def _charger_camembert_pipeline():
     """Charge la pipeline CamemBERT pour l'inférence fill-mask."""
 
     try:
+        tokenizer = AutoTokenizer.from_pretrained(
+            "cmarkea/distilcamembert-base", use_fast=False
+        )
         return pipeline(
             "fill-mask",
             model="cmarkea/distilcamembert-base",
-            tokenizer_kwargs={"use_fast": False},
+            tokenizer=tokenizer,
         )
     except Exception as exc:  # pragma: no cover - uniquement déclenché en environnement Streamlit
         st.error(
@@ -26,27 +29,6 @@ def _charger_camembert_pipeline():
         )
         st.exception(exc)
         return None
-
-
-def _precharger_si_demande():
-    """Précharge CamemBERT si l'utilisateur a activé le chargement automatique."""
-
-    if st.session_state.get("camembert_autoload") and not st.session_state.get(
-        "camembert_charge"
-    ):
-        with st.spinner(
-            "Chargement automatique du modèle CamemBERT activé, merci de patienter..."
-        ):
-            pipeline_camembert = _charger_camembert_pipeline()
-
-        if pipeline_camembert is None:
-            st.warning(
-                "Le modèle n'a pas pu être initialisé automatiquement. Cliquez sur le bouton ci-dessous pour réessayer."
-            )
-            return
-
-        st.session_state["camembert_charge"] = True
-        st.success("CamemBERT a été téléchargé et initialisé automatiquement.")
 
 
 def _construire_df_predictions(predictions) -> pd.DataFrame:
@@ -99,15 +81,11 @@ def render_camembert_tab(
 
     if "camembert_charge" not in st.session_state:
         st.session_state["camembert_charge"] = False
-    if "camembert_autoload" not in st.session_state:
-        st.session_state["camembert_autoload"] = False
-
-    _precharger_si_demande()
 
     col_charger, col_inferer = st.columns([1, 2])
     with col_charger:
-        if st.button("Télécharger / Charger CamemBERT", type="primary"):
-            with st.spinner("Téléchargement et initialisation du modèle CamemBERT..."):
+        if st.button("Lancer l'import CamemBERT", type="primary"):
+            with st.spinner("Import et initialisation du modèle CamemBERT..."):
                 pipeline_camembert = _charger_camembert_pipeline()
 
             if pipeline_camembert is None:
@@ -118,17 +96,10 @@ def render_camembert_tab(
                 st.session_state["camembert_charge"] = True
                 st.success("CamemBERT est prêt pour l'inférence.")
 
-        st.checkbox(
-            "Charger automatiquement CamemBERT à l'ouverture de l'onglet",
-            key="camembert_autoload",
-            help=(
-                "Permet de précharger le modèle dès l'accès à l'onglet pour limiter les erreurs "
-                "lors du lancement de l'application et éviter de charger plusieurs modèles simultanément."
-            ),
-        )
-
     if not st.session_state.get("camembert_charge"):
-        st.info("Cliquez sur le bouton ci-dessus pour télécharger et initialiser CamemBERT avant l'analyse.")
+        st.info(
+            "Cliquez sur le bouton ci-dessus pour importer et initialiser CamemBERT avant l'analyse."
+        )
         return
 
     if "<mask>" not in texte_cible:
@@ -142,7 +113,7 @@ def render_camembert_tab(
 
                 if pipe is None:
                     st.warning(
-                        "Le modèle CamemBERT n'a pas été initialisé. Cliquez d'abord sur le bouton de téléchargement."
+                        "Le modèle CamemBERT n'a pas été initialisé. Cliquez d'abord sur le bouton d'import."
                     )
                     return
 
