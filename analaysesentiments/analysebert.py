@@ -197,24 +197,33 @@ def render_camembert_tab(
         " (étiquettes étoiles regroupées en valence positive / neutre / négative)."
     )
 
+    st.markdown(
+        """
+        **Comment fonctionne cette analyse ?**
+
+        * Le modèle [CamemBERT](https://huggingface.co/cmarkea/distilcamembert-base-sentiment) est spécialisé pour le français.
+        * Chaque discours est découpé en phrases avant d'être envoyé au modèle de classification.
+        * Les étiquettes « 1 à 5 étoiles » sont converties en trois sentiments (positif, neutre, négatif) puis agrégées pour donner un score par phrase.
+        * Les tableaux et graphiques ci-dessous affichent ces scores pour visualiser la polarité générale du texte.
+        """
+    )
+
     texte_cible = _selectionner_texte(texte_discours_1, texte_discours_2, nom_discours_1, nom_discours_2)
     texte_cible = normaliser_espace(texte_cible)
 
     if "camembert_pipe" not in st.session_state:
         st.session_state["camembert_pipe"] = None
 
-    col_charger, col_inferer = st.columns([1, 2])
-    with col_charger:
-        if st.button("Lancer l'import CamemBERT", type="primary"):
-            with st.spinner("Import et initialisation du modèle CamemBERT..."):
-                st.session_state["camembert_pipe"] = _charger_camembert_pipeline()
+    if st.button("Lancer l'import CamemBERT", type="primary"):
+        with st.spinner("Import et initialisation du modèle CamemBERT..."):
+            st.session_state["camembert_pipe"] = _charger_camembert_pipeline()
 
-            if st.session_state["camembert_pipe"] is None:
-                st.warning(
-                    "Le modèle n'a pas pu être chargé. Vérifiez les dépendances puis réessayez."
-                )
-            else:
-                st.success("CamemBERT est prêt pour l'analyse de sentiments.")
+        if st.session_state["camembert_pipe"] is None:
+            st.warning(
+                "Le modèle n'a pas pu être chargé. Vérifiez les dépendances puis réessayez."
+            )
+        else:
+            st.success("CamemBERT est prêt pour l'analyse de sentiments.")
 
     if st.session_state.get("camembert_pipe") is None:
         st.info(
@@ -222,41 +231,40 @@ def render_camembert_tab(
         )
         return
 
-    with col_inferer:
-        if st.button("Lancer l'analyse CamemBERT"):
-            with st.spinner("Inférence en cours..."):
-                if st.session_state.get("camembert_pipe") is None:
-                    st.warning(
-                        "Le modèle CamemBERT n'a pas été initialisé. Cliquez d'abord sur le bouton d'import."
-                    )
-                    return
-
-                if not texte_cible:
-                    st.warning("Veuillez saisir un texte avant de lancer l'analyse.")
-                    return
-
-                phrases = segmenter_en_phrases(texte_cible) or [texte_cible]
-                predictions = st.session_state["camembert_pipe"](
-                    phrases, return_all_scores=True
+    if st.button("Lancer l'analyse CamemBERT"):
+        with st.spinner("Inférence en cours..."):
+            if st.session_state.get("camembert_pipe") is None:
+                st.warning(
+                    "Le modèle CamemBERT n'a pas été initialisé. Cliquez d'abord sur le bouton d'import."
                 )
-                df_sentiments = _construire_df_sentiments(phrases, predictions)
-
-            st.success("Analyse CamemBERT terminée.")
-            if df_sentiments.empty:
-                st.info("Aucun résultat disponible.")
                 return
 
-            st.markdown("#### Texte annoté")
-            for ligne in df_sentiments.itertuples():
-                badge = VALEUR_BADGES.get(ligne.valence.lower(), "🔎")
-                st.markdown(
-                    f"{badge} **Phrase {ligne.id_phrase}** — {ligne.valence}"
-                    f" (score {ligne.score_valence:.3f}) : {ligne.texte_phrase}"
-                )
+            if not texte_cible:
+                st.warning("Veuillez saisir un texte avant de lancer l'analyse.")
+                return
 
-            st.markdown("#### Tableau des scores")
-            st.dataframe(df_sentiments, use_container_width=True)
+            phrases = segmenter_en_phrases(texte_cible) or [texte_cible]
+            predictions = st.session_state["camembert_pipe"](
+                phrases, return_all_scores=True
+            )
+            df_sentiments = _construire_df_sentiments(phrases, predictions)
 
-            st.markdown("#### Graphiques des sentiments")
-            _tracer_barres_scores(df_sentiments)
-            _tracer_moyennes(df_sentiments)
+        st.success("Analyse CamemBERT terminée.")
+        if df_sentiments.empty:
+            st.info("Aucun résultat disponible.")
+            return
+
+        st.markdown("#### Texte annoté")
+        for ligne in df_sentiments.itertuples():
+            badge = VALEUR_BADGES.get(ligne.valence.lower(), "🔎")
+            st.markdown(
+                f"{badge} **Phrase {ligne.id_phrase}** — {ligne.valence}"
+                f" (score {ligne.score_valence:.3f}) : {ligne.texte_phrase}"
+            )
+
+        st.markdown("#### Tableau des scores")
+        st.dataframe(df_sentiments, use_container_width=True)
+
+        st.markdown("#### Graphiques des sentiments")
+        _tracer_barres_scores(df_sentiments)
+        _tracer_moyennes(df_sentiments)
