@@ -62,6 +62,7 @@ class FeelLexiqueErreur(RuntimeError):
 
 
 _DEF_CHEMIN_FEEL = Path(__file__).resolve().parent.parent / "dictionnaires" / "feel.csv"
+POLARITE_NON_SPECIFIEE = "non spécifiée"
 
 
 EMOTION_COLORS: Dict[str, str] = {
@@ -179,7 +180,9 @@ def _indexer_lexique(lexique: pd.DataFrame) -> Dict[str, List[Dict[str, str]]]:
     }
 
 
-def analyser_emotions_feel(texte: str, lexique: pd.DataFrame, discours: str) -> List[EmotionScore]:
+def analyser_emotions_feel(
+    texte: str, lexique: pd.DataFrame, discours: str, consider_polarites: bool = True
+) -> List[EmotionScore]:
     """Calcule la distribution des émotions FEEL pour un discours."""
 
     texte_norm = normaliser_espace(texte)
@@ -194,11 +197,14 @@ def analyser_emotions_feel(texte: str, lexique: pd.DataFrame, discours: str) -> 
         return []
 
     tot_tokens = len(tokens)
+    group_cols = ["emotion", "polarite"] if consider_polarites else ["emotion"]
     agregat = (
-        jointure.groupby(["emotion", "polarite"], as_index=False)
+        jointure.groupby(group_cols, as_index=False)
         .size()
         .rename(columns={"size": "occurrences"})
     )
+    if not consider_polarites:
+        agregat["polarite"] = POLARITE_NON_SPECIFIEE
     agregat["poids"] = agregat["occurrences"] / float(tot_tokens)
     return [
         EmotionScore(
@@ -223,9 +229,11 @@ def _scores_en_dataframe(scores: Iterable[EmotionScore]) -> pd.DataFrame:
     return pd.DataFrame(data)
 
 
-def _etiquette_emotion_polarite(entree: Dict[str, str]) -> str:
+def _etiquette_emotion_polarite(entree: Dict[str, str], consider_polarites: bool) -> str:
     """Formate une étiquette lisible pour une entrée du lexique."""
 
+    if not consider_polarites:
+        return entree["emotion"]
     return f"{entree['emotion']} ({entree['polarite']})"
 
 
@@ -233,6 +241,7 @@ def _construire_html_texte_annotes(
     texte: str,
     lexique: pd.DataFrame,
     etiquettes_selectionnees: Optional[Set[str]] = None,
+    consider_polarites: bool = True,
 ) -> str:
     """Construit le HTML du texte original avec les lexèmes annotés FEEL."""
 
@@ -250,13 +259,18 @@ def _construire_html_texte_annotes(
         fragments.append(html.escape(texte[last_end:start]))
         lemme = match.group(0).lower()
         entrees = index_lexique.get(lemme, [])
-        etiquettes = {_etiquette_emotion_polarite(e) for e in entrees}
+        etiquettes = {
+            _etiquette_emotion_polarite(e, consider_polarites) for e in entrees
+        }
         etiquettes_a_afficher = (
             etiquettes if not etiquettes_selectionnees else etiquettes & etiquettes_selectionnees
         )
         if etiquettes_a_afficher:
             entrees_filtrees = [
-                e for e in entrees if _etiquette_emotion_polarite(e) in etiquettes_a_afficher
+                e
+                for e in entrees
+                if _etiquette_emotion_polarite(e, consider_polarites)
+                in etiquettes_a_afficher
             ]
             emotion_principale = entrees_filtrees[0]["emotion"]
             couleur = EMOTION_COLORS.get(emotion_principale, "#bbbbbb")
@@ -280,11 +294,15 @@ def _annoter_texte_avec_emotions(
     texte: str,
     lexique: pd.DataFrame,
     etiquettes_selectionnees: Optional[Set[str]] = None,
+    consider_polarites: bool = True,
 ):
     """Affiche le texte original en surlignant les lexèmes annotés FEEL."""
 
     html_annotes = _construire_html_texte_annotes(
-        texte, lexique, etiquettes_selectionnees=etiquettes_selectionnees
+        texte,
+        lexique,
+        etiquettes_selectionnees=etiquettes_selectionnees,
+        consider_polarites=consider_polarites,
     )
     if not html_annotes:
         st.info("Aucun texte ou lexique FEEL pour afficher des étiquettes.")
@@ -295,7 +313,7 @@ def _annoter_texte_avec_emotions(
 
 
 def _proportions_temporelles(
-    texte: str, lexique: pd.DataFrame, discours: str
+    texte: str, lexique: pd.DataFrame, discours: str, consider_polarites: bool = True
 ) -> pd.DataFrame:
     """Calcule la proportion des émotions/polarités par phrase."""
 
@@ -321,30 +339,17 @@ def _proportions_temporelles(
 
         compteur: Dict[tuple[str, str], int] = {}
         for entree in mentions:
-            cle = (entree["emotion"], entree["polarite"])
+            cle = (
+                entree["emotion"],
+                entree["polarite"] if consider_polarites else POLARITE_NON_SPECIFIEE,
+            )
             compteur[cle] = compteur.get(cle, 0) + 1
-
-        compteur_polarite: Dict[str, int] = {}
-        for (_, polarite), occ in compteur.items():
-            compteur_polarite[polarite] = compteur_polarite.get(polarite, 0) + occ
 
         for (emotion, polarite), occ in compteur.items():
             data.append(
                 {
                     "id_phrase": idx,
                     "emotion": emotion,
-                    "polarite": polarite,
-                    "proportion": occ / float(total_mentions),
-                    "occurrences": occ,
-                    "discours": discours,
-                }
-            )
-
-        for polarite, occ in compteur_polarite.items():
-            data.append(
-                {
-                    "id_phrase": idx,
-                    "emotion": f"polarité {polarite}",
                     "polarite": polarite,
                     "proportion": occ / float(total_mentions),
                     "occurrences": occ,
@@ -408,20 +413,21 @@ def _afficher_intro_methodologie():
     st.markdown("Référence du modèle : Le Lexique FEEL - fr")
 
 
-def _visualiser_scores(df: pd.DataFrame, titre: str):
+def _visualiser_scores(df: pd.DataFrame, titre: str, consider_polarites: bool):
     """Affiche un histogramme des émotions détectées."""
 
     if df.empty:
         st.info("Aucune émotion FEEL détectée dans ce discours.")
         return
 
+    color_field = "polarite" if consider_polarites else "emotion"
     chart = (
         alt.Chart(df)
         .mark_bar()
         .encode(
             y=alt.Y("emotion:N", sort="-x", title="Émotion"),
             x=alt.X("occurrences:Q", title="Occurrences"),
-            color=alt.Color("polarite:N", title="Polarité"),
+            color=alt.Color(f"{color_field}:N", title="Polarité" if consider_polarites else "Émotion"),
             tooltip=["emotion", "polarite", "occurrences", alt.Tooltip("poids:Q", format=".2%")],
         )
         .properties(title=titre)
@@ -438,6 +444,24 @@ def render_feel_tab(
     """Rendu Streamlit pour l'onglet FEEL."""
 
     _afficher_intro_methodologie()
+
+    st.markdown("#### Options d'affichage")
+    consider_polarites = st.checkbox(
+        "Prendre en compte la polarité positive/négative",
+        value=True,
+        help="Affiche les résultats en distinguant les polarités des émotions.",
+        key="feel_consider_polarites",
+    )
+    emotions_uniquement = st.checkbox(
+        "Afficher uniquement les émotions (sans polarités)",
+        value=False,
+        help="Regroupe les scores par émotion sans distinguer la valence.",
+        key="feel_emotions_uniquement",
+    )
+    if emotions_uniquement:
+        consider_polarites = False
+    elif not consider_polarites:
+        emotions_uniquement = False
 
     if not texte_discours_1.strip() and not texte_discours_2.strip():
         st.info(
@@ -461,7 +485,9 @@ def render_feel_tab(
     for tab, (nom, contenu) in zip(onglets, discours_disponibles.items()):
         with tab:
             st.markdown(f"#### {nom}")
-            scores = analyser_emotions_feel(contenu, lexique_feel, nom)
+            scores = analyser_emotions_feel(
+                contenu, lexique_feel, nom, consider_polarites=consider_polarites
+            )
             df_scores = _scores_en_dataframe(scores)
             if df_scores.empty:
                 st.info("Aucune correspondance FEEL trouvée dans ce discours.")
@@ -471,18 +497,27 @@ def render_feel_tab(
                 df_scores.sort_values("occurrences", ascending=False),
                 use_container_width=True,
             )
-            _visualiser_scores(df_scores, titre=f"Distribution émotionnelle — {nom}")
+            _visualiser_scores(
+                df_scores,
+                titre=f"Distribution émotionnelle — {nom}",
+                consider_polarites=consider_polarites,
+            )
 
             st.markdown("##### Texte annoté (étiquettes émotion/polarité)")
-            etiquettes_disponibles = sorted(
-                {
-                    f"{emotion} ({polarite})"
-                    for emotion, polarite in lexique_feel[["emotion", "polarite"]]
-                    .dropna()
-                    .drop_duplicates()
-                    .itertuples(index=False)
-                }
-            )
+            if consider_polarites:
+                etiquettes_disponibles = sorted(
+                    {
+                        f"{emotion} ({polarite})"
+                        for emotion, polarite in lexique_feel[["emotion", "polarite"]]
+                        .dropna()
+                        .drop_duplicates()
+                        .itertuples(index=False)
+                    }
+                )
+            else:
+                etiquettes_disponibles = sorted(
+                    lexique_feel["emotion"].dropna().drop_duplicates().tolist()
+                )
             selection_etiquettes = set(
                 st.multiselect(
                     "Sélectionnez les étiquettes à surligner (laissez vide pour tout afficher)",
@@ -494,6 +529,7 @@ def render_feel_tab(
                 contenu,
                 lexique_feel,
                 etiquettes_selectionnees=selection_etiquettes,
+                consider_polarites=consider_polarites,
             )
             if html_annotes:
                 st.download_button(
@@ -504,16 +540,23 @@ def render_feel_tab(
                 )
 
             st.markdown("##### Évolution temporelle des émotions/polarités")
-            df_proportions = _proportions_temporelles(contenu, lexique_feel, nom)
-            etiquettes_proportions = sorted(
-                {
-                    f"{emotion} ({polarite})"
-                    for emotion, polarite in df_proportions[["emotion", "polarite"]]
-                    .dropna()
-                    .drop_duplicates()
-                    .itertuples(index=False)
-                }
+            df_proportions = _proportions_temporelles(
+                contenu, lexique_feel, nom, consider_polarites=consider_polarites
             )
+            if consider_polarites:
+                etiquettes_proportions = sorted(
+                    {
+                        f"{emotion} ({polarite})"
+                        for emotion, polarite in df_proportions[["emotion", "polarite"]]
+                        .dropna()
+                        .drop_duplicates()
+                        .itertuples(index=False)
+                    }
+                )
+            else:
+                etiquettes_proportions = sorted(
+                    df_proportions["emotion"].dropna().drop_duplicates().tolist()
+                )
             selection_proportions = set(
                 st.multiselect(
                     "Choix des marqueurs/polarités à afficher",
@@ -526,7 +569,11 @@ def render_feel_tab(
             df_proportions_filtres = (
                 df_proportions[
                     df_proportions.apply(
-                        lambda row: f"{row['emotion']} ({row['polarite']})"
+                        lambda row: (
+                            f"{row['emotion']} ({row['polarite']})"
+                            if consider_polarites
+                            else row["emotion"]
+                        )
                         in selection_proportions,
                         axis=1,
                     )
