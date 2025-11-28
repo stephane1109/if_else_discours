@@ -995,10 +995,36 @@ tab_comparatif = None
 
 # Onglet Analyses (listes + texte annoté)
 with tab_detections:
+    analyse_options = [
+        {
+            "id": "disc1",
+            "label": libelle_discours_1,
+            "texte": texte_source,
+            "detections": detections_1,
+        }
+    ]
+    if texte_source_2.strip() or (
+        nom_discours_2.strip() and nom_discours_2.strip() != "Discours 2"
+    ):
+        analyse_options.append(
+            {
+                "id": "disc2",
+                "label": libelle_discours_2,
+                "texte": texte_source_2,
+                "detections": detections_2,
+            }
+        )
+
+    selection_analyse = st.selectbox(
+        "Choisir le discours à analyser",
+        options=analyse_options,
+        format_func=lambda opt: opt["label"],
+    )
+
     render_analyses_tab(
-        libelle_discours_1,
-        texte_source,
-        detections_1,
+        selection_analyse["label"],
+        selection_analyse["texte"],
+        selection_analyse["detections"],
         use_regex_cc=use_regex_cc,
         dico_connecteurs=DICO_CONNECTEURS,
         dico_marqueurs=DICO_MARQUEURS,
@@ -1006,6 +1032,7 @@ with tab_detections:
         dico_consq=DICO_CONSQS,
         dico_causes=DICO_CAUSES,
         dico_tensions=DICO_TENSIONS,
+        key_prefix=f"{selection_analyse['id']}_",
     )
 
 # Onglet Dictionnaires (JSON)
