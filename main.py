@@ -1015,10 +1015,15 @@ with tab_detections:
             }
         )
 
-    selection_analyse = st.selectbox(
+    option_ids = [opt["id"] for opt in analyse_options]
+    labels_by_id = {opt["id"]: opt["label"] for opt in analyse_options}
+    selected_id = st.selectbox(
         "Choisir le discours à analyser",
-        options=analyse_options,
-        format_func=lambda opt: opt["label"],
+        options=option_ids,
+        format_func=lambda oid: labels_by_id.get(oid, oid),
+    )
+    selection_analyse = next(
+        (opt for opt in analyse_options if opt["id"] == selected_id), analyse_options[0]
     )
 
     render_analyses_tab(
