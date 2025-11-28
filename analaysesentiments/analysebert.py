@@ -121,6 +121,52 @@ def _tracer_barres_scores(df_sentiments: pd.DataFrame):
     st.altair_chart(chart, use_container_width=True)
 
 
+def _ajouter_lissage(df_sentiments: pd.DataFrame, fenetre: int) -> pd.DataFrame:
+    """Calcule une moyenne glissante de la valence pondérée par le score."""
+
+    if df_sentiments.empty:
+        return df_sentiments
+
+    poids_valence = {"positive": 1.0, "neutral": 0.0, "negative": -1.0}
+    df_lisse = df_sentiments.copy()
+    df_lisse = df_lisse.sort_values("id_phrase")
+    df_lisse["valence_ponderee"] = (
+        df_lisse["valence"].str.lower().map(poids_valence).fillna(0)
+        * df_lisse["score_valence"].astype(float)
+    )
+    df_lisse["valence_lissee"] = df_lisse["valence_ponderee"].rolling(
+        window=fenetre, min_periods=1, center=True
+    ).mean()
+    return df_lisse
+
+
+def _tracer_courbe_valence(df_sentiments: pd.DataFrame, fenetre: int):
+    """Affiche une courbe de valence similaire à celle de l'analyse VADER."""
+
+    if df_sentiments.empty:
+        st.info("Aucune phrase à représenter.")
+        return
+
+    df_lisse = _ajouter_lissage(df_sentiments, fenetre)
+    chart = (
+        alt.Chart(df_lisse)
+        .mark_line(point=True)
+        .encode(
+            x=alt.X("id_phrase:Q", title="Temps (phrases)"),
+            y=alt.Y("valence_lissee:Q", title="Valence pondérée (moyenne glissante)"),
+            tooltip=[
+                "id_phrase",
+                "valence",
+                alt.Tooltip("score_valence:Q", format=".3f"),
+                alt.Tooltip("valence_lissee:Q", format=".3f"),
+                "texte_phrase",
+            ],
+        )
+        .properties(height=300, width="container")
+    )
+    st.altair_chart(chart, use_container_width=True)
+
+
 def _tracer_moyennes(df_sentiments: pd.DataFrame):
     """Affiche un graphique des moyennes des scores par sentiment."""
 
@@ -235,6 +281,15 @@ def render_camembert_tab(
         " à tonalité plus nuancée."
     )
 
+    fenetre_lissage = st.slider(
+        "Taille de la moyenne glissante pour la courbe CamemBERT (en nombre de phrases)",
+        min_value=1,
+        max_value=30,
+        value=5,
+        step=1,
+        help="Augmenter cette valeur permet d'adoucir la courbe de valence affichée plus bas.",
+    )
+
     if "camembert_pipe" not in st.session_state:
         st.session_state["camembert_pipe"] = None
 
@@ -297,4 +352,5 @@ def render_camembert_tab(
 
         st.markdown("#### Graphiques des sentiments")
         _tracer_barres_scores(df_affiches)
+        _tracer_courbe_valence(df_affiches, fenetre_lissage)
         _tracer_moyennes(df_affiches)
