@@ -229,6 +229,11 @@ def render_camembert_tab(
         step=0.01,
         help="Les phrases dont le score agrégé est inférieur à ce seuil sont masquées dans les résultats.",
     )
+    st.caption(
+        "Plus vous augmentez ce seuil, plus seules les phrases dont la valence est clairement"
+        " positive ou négative resteront affichées ; un seuil bas laisse passer les phrases"
+        " à tonalité plus nuancée."
+    )
 
     if "camembert_pipe" not in st.session_state:
         st.session_state["camembert_pipe"] = None
