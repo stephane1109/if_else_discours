@@ -984,7 +984,7 @@ libelle_discours_2 = (
         "Lexique",
         "Annot",
         "Storytelling",
-        "ASentiments",
+        "ASentsVader",
         "AnalysSentCamemBert",
         "FEEL",
     ]
