@@ -117,7 +117,9 @@ def _afficher_intro_methodologie():
         Analyse lexicale avec vaderSentiment-fr.
         Cette méthode exploite l'adaptation française de VADER (Valence Aware Dictionary for Sentiment Reasoning), basée sur un lexique et des règles pour estimer la valence des phrases.
 
-        La Courbe de Valence Émotionnelle 
+        Ressource : la librairie Python est disponible sur PyPI : [vaderSentiment-fr](https://pypi.org/project/vaderSentiment-fr/).
+
+        La Courbe de Valence Émotionnelle
         Pour construire ce graph, le script doit attribuer un score à chaque phrase :
 
             Axe X (Temps) : Le déroulement du discours (du début à la fin).
