@@ -43,6 +43,7 @@ def _selectionner_texte(
             "Choisissez un discours à charger dans la zone de test",
             options=list(textes_disponibles.keys()),
             help="Le texte sélectionné est pré-rempli ci-dessous pour l'inférence Zero-Shot.",
+            key="zero_shot_discours_select",
         )
 
     contenu_initial = textes_disponibles.get(choix, "") if choix else ""
@@ -51,6 +52,7 @@ def _selectionner_texte(
         value=contenu_initial
         or "Ces derniers temps, je pense de plus en plus à en finir.",
         height=200,
+        key="zero_shot_text_area",
     )
 
 
