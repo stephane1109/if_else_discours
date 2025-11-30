@@ -85,6 +85,20 @@ def render_zero_shot_tab(
 
     st.markdown(
         """
+        **Modèle utilisé :** `MoritzLaurer/mDeBERTa-v3-base-mnli-xnli` pour la tâche
+        *zero-shot-classification*.
+
+        Le modèle « Zero-Shot multilingue » est conçu pour fonctionner sur plusieurs
+        langues, dont le français (le dataset XNLI utilisé pour ce modèle couvre 15
+        langues, y compris le français).
+
+        Référence Hugging Face :
+        https://huggingface.co/MoritzLaurer/mDeBERTa-v3-base-mnli-xnli
+        """
+    )
+
+    st.markdown(
+        """
         Exemple d'usage :
 
         ```python
