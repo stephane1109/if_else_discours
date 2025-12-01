@@ -292,8 +292,13 @@ def render_camembert_tab(
 
     st.markdown("### AnalysSentCamemBert")
     st.caption(
-        "Analyse de sentiments en français basée sur cmarkea/distilcamembert-base-sentiment"
-        " (étiquettes étoiles regroupées en valence positive / neutre / négative)."
+        "Analyse de sentiments en français basée sur le modèle [cmarkea/distilcamembert-base-sentiment]"
+        "(https://huggingface.co/cmarkea/distilcamembert-base-sentiment). Le modèle est entraîné"
+        " sur deux jeux de données français : des avis Amazon (dataset amazon_reviews_multi,"
+        " version française) et des critiques de films du site AlloCiné (dataset tblard/allocine),"
+        " soit environ 205 000 avis Amazon et 235 000 critiques Allociné avec des étiquettes de"
+        " sentiment en 5 niveaux (1 à 5 étoiles). Il est particulièrement adapté aux commentaires"
+        " courts en français."
     )
 
     st.markdown(
