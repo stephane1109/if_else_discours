@@ -292,8 +292,11 @@ def render_camembert_tab(
 
     st.markdown("### AnalysSentCamemBert")
     st.caption(
-        "Analyse de sentiments en français basée sur cmarkea/distilcamembert-base-sentiment"
-        " (étiquettes étoiles regroupées en valence positive / neutre / négative)."
+        "Analyse de sentiments en français basée sur le modèle [cmarkea/distilcamembert-base-sentiment]"
+        "(https://huggingface.co/cmarkea/distilcamembert-base-sentiment),"
+        " entraîné sur un jeu de données d'avis AlloCiné (étiquettes étoiles regroupées en"
+        " valence positive / neutre / négative), particulièrement adapté aux commentaires"
+        " courts en français."
     )
 
     st.markdown(
