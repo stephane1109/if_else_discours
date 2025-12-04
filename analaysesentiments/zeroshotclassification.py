@@ -103,7 +103,7 @@ def render_zero_shot_tab(
 
         ```python
         phrase_suicide = "Ces derniers temps, je pense de plus en plus à en finir."
-        labels = ["espoir", "détresse", "problème technique", "solution politique", "neutre"]
+        labels = ["espoir", "détresse", "problème", "solution", "neutre"]
         ```
 
         Définissez ci-dessous vos propres étiquettes (séparées par des virgules) pour obtenir la probabilité
