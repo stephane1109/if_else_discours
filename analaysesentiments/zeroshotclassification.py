@@ -116,7 +116,7 @@ def render_zero_shot_tab(
 
     etiquettes_str = st.text_input(
         "Étiquettes (séparées par des virgules)",
-        value="espoir, détresse, problème technique, solution politique, neutre",
+        value="espoir, détresse, problème, solution, neutre",
         help="Renseignez les labels à tester pour la classification Zero-Shot.",
     )
     etiquettes = [label.strip() for label in etiquettes_str.split(",") if label.strip()]
