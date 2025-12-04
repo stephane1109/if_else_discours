@@ -1,4 +1,4 @@
-"""Onglet d'analyse Zero-Shot Classification pour l'application Streamlit."""
+"""Onglet d'analyse Zero-Shot Classification"""
 from __future__ import annotations
 
 from typing import List
