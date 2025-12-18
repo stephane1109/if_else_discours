@@ -19,7 +19,7 @@ import unicodedata
 import prince
 from sklearn.feature_extraction.text import CountVectorizer
 
-from stopwords_fr import FRENCH_STOPWORDS
+from spacy.lang.fr.stop_words import STOP_WORDS as SPACY_STOP_WORDS
 from text_utils import normaliser_espace, segmenter_en_phrases
 
 
