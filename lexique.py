@@ -11,9 +11,9 @@ def render_lexique_tab() -> None:
         dedent(
             """Le script repose sur des dictionnaires au format JSON et sur un ensemble de règles regex,
             qui servent à repérer précisément des motifs linguistiques définis à l’avance.
-            Les regex sont moins souples qu’une approche par NLP automatique comme SpaCy,
+            Les regex sont moins souples qu’une approche NLP automatique,
             mais elles permettent, par leur caractère très ciblé, d’atteindre un niveau de précision et de contrôle dans
-            l’analyse. Même si je travaille actuellement sur une comparaison systématique entre les règles regex et le modèle NLP de SpaCy,
+            l’analyse. Même si je travaille actuellement sur une comparaison systématique entre les règles regex et des modèles NLP,
             l’intérêt des regex est de garantir une grande precision dans l'analyse."""
         )
     )
@@ -84,7 +84,7 @@ def render_lexique_tab() -> None:
         "- **CONSEQUENCE** : en déduit l’effet ou l’issue (donc, alors, par conséquent…)."
     )
 
-    st.markdown("#### Lexique grammatical spaCy (causalité)")
+    st.markdown("#### Lexique grammatical (causalité)")
     st.markdown(
         "- **CAUSE_GN** : cause exprimée par un groupe nominal (souvent introduit par *en raison de*, *à cause de*…). Exemple : *En raison de la tempête, le match est reporté.*\n"
         "- **CONSEQUENCE_ADV** : conséquence exprimée par un adverbe ou un groupe adverbial (ex. *donc*, *par conséquent*). Exemple : *Il a tout expliqué, par conséquent nous comprenons la décision.*\n"
