@@ -200,35 +200,37 @@ def tracer_nuage_factoriel(
     axe_x: int,
     axe_y: int,
     nb_mots: int,
+    afficher_phrases: bool,
+    afficher_mots: bool,
 ) -> alt.Chart:
     """Construit le nuage factoriel (axes sélectionnés)."""
 
     dims = [f"Dim {axe_x}", f"Dim {axe_y}"]
-
-    data_phrases = (
-        row_coords[dims]
-        .reset_index()
-        .rename(columns={"index": "libelle"})
-        .merge(df_phrases[["label_afc", "texte_phrase", "discours"]], left_on="libelle", right_on="label_afc", how="left")
-        .assign(Type="Phrase")
-    )
-
-    data_mots = _extraire_mots_contributifs(col_coords, axe_x, axe_y, nb_mots)
-    data_marqueurs = coords_marqueurs[["libelle", "Dim 1", "Dim 2", "Type"]] if not coords_marqueurs.empty else pd.DataFrame(columns=["libelle", "Dim 1", "Dim 2", "Type"])
-
     couches = []
     couleur = alt.condition(alt.datum.Type == "Phrase", alt.value("#1f77b4"), alt.value("#d62728"))
 
-    couches.append(
-        alt.Chart(data_phrases)
-        .mark_circle(size=80, opacity=0.75)
-        .encode(
-            x=dims[0],
-            y=dims[1],
-            color=couleur,
-            tooltip=["libelle", "discours", "texte_phrase", alt.Tooltip(dims[0], format=".3f"), alt.Tooltip(dims[1], format=".3f")],
+    if afficher_phrases:
+        data_phrases = (
+            row_coords[dims]
+            .reset_index()
+            .rename(columns={"index": "libelle"})
+            .merge(df_phrases[["label_afc", "texte_phrase", "discours"]], left_on="libelle", right_on="label_afc", how="left")
+            .assign(Type="Phrase")
         )
-    )
+
+        couches.append(
+            alt.Chart(data_phrases)
+            .mark_circle(size=80, opacity=0.75)
+            .encode(
+                x=dims[0],
+                y=dims[1],
+                color=couleur,
+                tooltip=["libelle", "discours", "texte_phrase", alt.Tooltip(dims[0], format=".3f"), alt.Tooltip(dims[1], format=".3f")],
+            )
+        )
+
+    data_mots = _extraire_mots_contributifs(col_coords, axe_x, axe_y, nb_mots) if afficher_mots else pd.DataFrame(columns=["libelle", "Dim 1", "Dim 2", "Type"])
+    data_marqueurs = coords_marqueurs[["libelle", "Dim 1", "Dim 2", "Type"]] if not coords_marqueurs.empty else pd.DataFrame(columns=["libelle", "Dim 1", "Dim 2", "Type"])
 
     if not data_mots.empty:
         couches.append(
@@ -242,6 +244,14 @@ def tracer_nuage_factoriel(
             alt.Chart(data_marqueurs)
             .mark_point(shape="triangle", size=180, color="#f28e2c")
             .encode(x="Dim 1", y="Dim 2", tooltip=["libelle", alt.Tooltip("Dim 1", format=".3f"), alt.Tooltip("Dim 2", format=".3f")])
+        )
+
+    if not couches:
+        return (
+            alt.Chart(pd.DataFrame(columns=dims))
+            .mark_point()
+            .encode(x=dims[0], y=dims[1])
+            .properties(height=480, width="container")
         )
 
     return alt.layer(*couches).properties(height=480, width="container").resolve_scale(color="independent", shape="independent")
@@ -300,6 +310,8 @@ def render_afc_tab(
     axe_x = int(col_axes.number_input("Axe X", min_value=1, max_value=4, value=1, step=1))
     axe_y = int(col_axes.number_input("Axe Y", min_value=1, max_value=4, value=2, step=1))
     nb_mots = col_axes.slider("Mots affichés", min_value=5, max_value=50, value=15, step=5)
+    afficher_phrases = col_axes.checkbox("Afficher les phrases", value=True, help="Désactivez pour ne projeter que les mots et les marqueurs.")
+    afficher_mots = col_axes.checkbox("Afficher les mots contributifs", value=True)
 
     if axe_x == axe_y:
         st.warning("Veuillez sélectionner deux axes différents pour l'affichage.")
@@ -325,7 +337,17 @@ def render_afc_tab(
         return
 
     coords_marqueurs = calculer_barycentres_marqueurs(row_df, df_selection, selection_cols, axe_x, axe_y)
-    chart = tracer_nuage_factoriel(row_df, col_df, df_selection, coords_marqueurs, axe_x, axe_y, nb_mots)
+    chart = tracer_nuage_factoriel(
+        row_df,
+        col_df,
+        df_selection,
+        coords_marqueurs,
+        axe_x,
+        axe_y,
+        nb_mots,
+        afficher_phrases,
+        afficher_mots,
+    )
 
     inertie = ca.eigenvalues_.sum()
     explained_inertia = getattr(ca, "explained_inertia_", [])
