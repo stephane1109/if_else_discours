@@ -16,7 +16,8 @@ import pandas as pd
 import streamlit as st
 import unicodedata
 
-import prince
+import numpy as np
+from sklearn.decomposition import PCA
 from sklearn.feature_extraction.text import CountVectorizer
 from spacy.lang.fr.stop_words import STOP_WORDS as SPACY_STOP_WORDS
 
@@ -138,17 +139,44 @@ def preparer_matrice_afc(
     return df_selection, matrice_mots, vectorizer
 
 
-def lancer_afc(matrice_mots: pd.DataFrame, n_composantes: int = 4) -> Tuple[pd.DataFrame, pd.DataFrame, prince.CA]:
-    """Applique l'AFC via prince et renomme les dimensions."""
+def lancer_afc(
+    matrice_mots: pd.DataFrame, n_composantes: int = 4
+) -> Tuple[pd.DataFrame, pd.DataFrame, PCA]:
+    """Applique une AFC via décomposition en valeurs singulières (PCA sur résidus)."""
 
-    ca = prince.CA(n_components=max(2, n_composantes), n_iter=10, copy=True, random_state=0)
-    ca = ca.fit(matrice_mots)
-    row_df = ca.row_coordinates(matrice_mots)
-    col_df = ca.column_coordinates(matrice_mots)
+    if matrice_mots.empty:
+        raise ValueError("Matrice vide : impossible de réaliser l'AFC.")
+
+    tableau = matrice_mots.to_numpy(dtype=float)
+    total = tableau.sum()
+    if total <= 0:
+        raise ValueError("Somme nulle : impossible de calculer les profils pour l'AFC.")
+
+    profils = tableau / total
+    masses_lignes = profils.sum(axis=1, keepdims=True)
+    masses_colonnes = profils.sum(axis=0, keepdims=True)
+    attendus = masses_lignes @ masses_colonnes
+
+    with np.errstate(divide="ignore", invalid="ignore"):
+        residus = (profils - attendus) / np.sqrt(attendus)
+    residus = np.nan_to_num(residus, nan=0.0, posinf=0.0, neginf=0.0)
+
+    max_dim = max(2, n_composantes)
+    limite = min(residus.shape[0], residus.shape[1])
+    n_comp = min(max_dim, limite)
+    if n_comp < 2:
+        raise ValueError("Dimensions insuffisantes pour calculer deux axes factoriels.")
+
+    pca = PCA(n_components=n_comp, random_state=0)
+    coords_lignes = pca.fit_transform(residus)
+    coords_colonnes = pca.components_.T * pca.singular_values_
+
+    row_df = pd.DataFrame(coords_lignes, index=matrice_mots.index)
+    col_df = pd.DataFrame(coords_colonnes, index=matrice_mots.columns)
 
     row_df.columns = [f"Dim {i+1}" for i in range(row_df.shape[1])]
     col_df.columns = [f"Dim {i+1}" for i in range(col_df.shape[1])]
-    return row_df, col_df, ca
+    return row_df, col_df, pca
 
 
 def calculer_barycentres_marqueurs(
@@ -189,7 +217,12 @@ def _extraire_mots_contributifs(
     dims = [f"Dim {axe_x}", f"Dim {axe_y}"]
     scores = (col_coords[dims] ** 2).sum(axis=1)
     principaux = scores.nlargest(nb_mots).index
-    return col_coords.loc[principaux, dims].reset_index().rename(columns={"index": "libelle"}).assign(Type="Mot")
+
+    selection = col_coords.loc[principaux, dims].reset_index().rename(columns={"index": "libelle"})
+    selection["Type"] = selection["libelle"].apply(
+        lambda mot: "Variable illustrative" if str(mot).startswith("*") else "Mot"
+    )
+    return selection
 
 
 def tracer_nuage_factoriel(
@@ -200,41 +233,59 @@ def tracer_nuage_factoriel(
     axe_x: int,
     axe_y: int,
     nb_mots: int,
+    afficher_phrases: bool,
+    afficher_mots: bool,
 ) -> alt.Chart:
     """Construit le nuage factoriel (axes sélectionnés)."""
 
     dims = [f"Dim {axe_x}", f"Dim {axe_y}"]
-
-    data_phrases = (
-        row_coords[dims]
-        .reset_index()
-        .rename(columns={"index": "libelle"})
-        .merge(df_phrases[["label_afc", "texte_phrase", "discours"]], left_on="libelle", right_on="label_afc", how="left")
-        .assign(Type="Phrase")
-    )
-
-    data_mots = _extraire_mots_contributifs(col_coords, axe_x, axe_y, nb_mots)
-    data_marqueurs = coords_marqueurs[["libelle", "Dim 1", "Dim 2", "Type"]] if not coords_marqueurs.empty else pd.DataFrame(columns=["libelle", "Dim 1", "Dim 2", "Type"])
-
     couches = []
-    couleur = alt.condition(alt.datum.Type == "Phrase", alt.value("#1f77b4"), alt.value("#d62728"))
 
-    couches.append(
-        alt.Chart(data_phrases)
-        .mark_circle(size=80, opacity=0.75)
-        .encode(
-            x=dims[0],
-            y=dims[1],
-            color=couleur,
-            tooltip=["libelle", "discours", "texte_phrase", alt.Tooltip(dims[0], format=".3f"), alt.Tooltip(dims[1], format=".3f")],
+    if afficher_phrases:
+        data_phrases = (
+            row_coords[dims]
+            .reset_index()
+            .rename(columns={"index": "libelle"})
+            .merge(df_phrases[["label_afc", "texte_phrase", "discours"]], left_on="libelle", right_on="label_afc", how="left")
+            .assign(Type="Phrase")
         )
+
+        couches.append(
+            alt.Chart(data_phrases)
+            .mark_circle(size=80, opacity=0.75)
+            .encode(
+                x=dims[0],
+                y=dims[1],
+                color=alt.value("#1f77b4"),
+                tooltip=["libelle", "discours", "texte_phrase", alt.Tooltip(dims[0], format=".3f"), alt.Tooltip(dims[1], format=".3f")],
+            )
+        )
+
+    data_mots = (
+        _extraire_mots_contributifs(col_coords, axe_x, axe_y, nb_mots)
+        if afficher_mots
+        else pd.DataFrame(columns=["libelle", "Dim 1", "Dim 2", "Type"])
+    )
+    data_marqueurs = (
+        coords_marqueurs[["libelle", "Dim 1", "Dim 2", "Type"]]
+        if not coords_marqueurs.empty
+        else pd.DataFrame(columns=["libelle", "Dim 1", "Dim 2", "Type"])
     )
 
     if not data_mots.empty:
         couches.append(
             alt.Chart(data_mots)
-            .mark_text(color="#444", fontSize=12, dy=-6)
-            .encode(x="Dim 1", y="Dim 2", text="libelle", tooltip=["libelle", alt.Tooltip("Dim 1", format=".3f"), alt.Tooltip("Dim 2", format=".3f")])
+            .mark_text(fontSize=12, dy=-6)
+            .encode(
+                x="Dim 1",
+                y="Dim 2",
+                text="libelle",
+                color=alt.Color(
+                    "Type:N",
+                    scale=alt.Scale(domain=["Mot", "Variable illustrative"], range=["#444", "#8b0000"]),
+                ),
+                tooltip=["libelle", "Type", alt.Tooltip("Dim 1", format=".3f"), alt.Tooltip("Dim 2", format=".3f")],
+            )
         )
 
     if not data_marqueurs.empty:
@@ -242,6 +293,14 @@ def tracer_nuage_factoriel(
             alt.Chart(data_marqueurs)
             .mark_point(shape="triangle", size=180, color="#f28e2c")
             .encode(x="Dim 1", y="Dim 2", tooltip=["libelle", alt.Tooltip("Dim 1", format=".3f"), alt.Tooltip("Dim 2", format=".3f")])
+        )
+
+    if not couches:
+        return (
+            alt.Chart(pd.DataFrame(columns=dims))
+            .mark_point()
+            .encode(x=dims[0], y=dims[1])
+            .properties(height=480, width="container")
         )
 
     return alt.layer(*couches).properties(height=480, width="container").resolve_scale(color="independent", shape="independent")
@@ -300,6 +359,8 @@ def render_afc_tab(
     axe_x = int(col_axes.number_input("Axe X", min_value=1, max_value=4, value=1, step=1))
     axe_y = int(col_axes.number_input("Axe Y", min_value=1, max_value=4, value=2, step=1))
     nb_mots = col_axes.slider("Mots affichés", min_value=5, max_value=50, value=15, step=5)
+    afficher_phrases = col_axes.checkbox("Afficher les phrases", value=True, help="Désactivez pour ne projeter que les mots et les marqueurs.")
+    afficher_mots = col_axes.checkbox("Afficher les mots contributifs", value=True)
 
     if axe_x == axe_y:
         st.warning("Veuillez sélectionner deux axes différents pour l'affichage.")
@@ -325,12 +386,20 @@ def render_afc_tab(
         return
 
     coords_marqueurs = calculer_barycentres_marqueurs(row_df, df_selection, selection_cols, axe_x, axe_y)
-    chart = tracer_nuage_factoriel(row_df, col_df, df_selection, coords_marqueurs, axe_x, axe_y, nb_mots)
+    chart = tracer_nuage_factoriel(
+        row_df,
+        col_df,
+        df_selection,
+        coords_marqueurs,
+        axe_x,
+        axe_y,
+        nb_mots,
+        afficher_phrases,
+        afficher_mots,
+    )
 
-    inertie = ca.eigenvalues_.sum()
-    explained_inertia = getattr(ca, "explained_inertia_", [])
-    if (explained_inertia is None or len(explained_inertia) == 0) and inertie:
-        explained_inertia = ca.eigenvalues_ / inertie  # Compatibilité pour les versions de prince sans explained_inertia_
+    inertie = ca.explained_variance_.sum()
+    explained_inertia = list(ca.explained_variance_ratio_)
 
     inertie_dim1 = explained_inertia[axe_x - 1] * 100 if len(explained_inertia) >= axe_x else 0.0
     inertie_dim2 = explained_inertia[axe_y - 1] * 100 if len(explained_inertia) >= axe_y else 0.0
